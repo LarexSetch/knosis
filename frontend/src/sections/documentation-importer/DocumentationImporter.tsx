@@ -4,12 +4,6 @@ import { SectionPage } from '../SectionPage';
 
 function DocumentationWorkspace() {
   return (
-    <SectionPage
-      eyebrow="Импорт документации"
-      title="Импортер документации"
-      description="Подготовьте документы для извлечения знаний."
-      icon={<BookOpenText size={20} />}
-    >
       <div className="welcome-card">
         <div className="welcome-kicker">DocumentationImporter</div>
         <h2>Рабочая область импорта</h2>
@@ -19,7 +13,6 @@ function DocumentationWorkspace() {
           <span>Структура раздела готова к наполнению</span>
         </div>
       </div>
-    </SectionPage>
   );
 }
 
