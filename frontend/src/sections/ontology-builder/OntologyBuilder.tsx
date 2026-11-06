@@ -8,14 +8,25 @@ import {
   useNodesState,
   type Connection,
 } from '@xyflow/react';
-import { Plus } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { Download, FolderOpen, Plus, Save, Upload } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import './OntologyBuilder.css';
 import { OntologyNode } from './OntologyNode';
 import { OntologyNodeEditor } from './OntologyNodeEditor';
 import { OntologyRelationshipEditor } from './OntologyRelationshipEditor';
+import {
+  mapGraphToOntology,
+  mapOntologyToGraph,
+} from './ontology-mapper';
+import {
+  exportOntology,
+  importOntology,
+  loadOntology,
+  saveOntology,
+} from './ontology-service';
+import type { OntologyMetadata } from './ontology-document.types';
 import {
   OntologyNodeIcon,
   type OntologyFlowNode,
@@ -74,10 +85,91 @@ const initialNodes: OntologyFlowNode[] = [
 function OntologyWorkspace() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>([]);
+  const [metadata, setMetadata] = useState<OntologyMetadata>(() => ({
+    name: 'Онтология',
+    version: '1.0.0',
+    generatedAt: new Date().toISOString(),
+  }));
+  const [fileStatus, setFileStatus] = useState('');
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+
+  const createOntologyDocument = () => {
+    const updatedMetadata = {
+      ...metadata,
+      generatedAt: new Date().toISOString(),
+    };
+    const ontology = mapGraphToOntology(nodes, edges, updatedMetadata);
+    setMetadata(updatedMetadata);
+    return ontology;
+  };
+
+  const handleSave = () => {
+    try {
+      saveOntology(createOntologyDocument());
+      setFileStatus('Онтология сохранена в браузере.');
+    } catch (error) {
+      setFileStatus(
+        error instanceof Error ? error.message : 'Не удалось сохранить онтологию.',
+      );
+    }
+  };
+
+  const handleLoad = () => {
+    try {
+      const ontology = loadOntology();
+      if (!ontology) {
+        setFileStatus('Сохранённая онтология не найдена.');
+        return;
+      }
+      const graph = mapOntologyToGraph(ontology);
+      setNodes(graph.nodes);
+      setEdges(graph.edges);
+      setMetadata(ontology.metadata);
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      setFileStatus('Онтология загружена.');
+    } catch (error) {
+      setFileStatus(
+        error instanceof Error ? error.message : 'Не удалось загрузить онтологию.',
+      );
+    }
+  };
+
+  const handleExport = () => {
+    try {
+      exportOntology(createOntologyDocument());
+      setFileStatus('Файл онтологии экспортирован.');
+    } catch (error) {
+      setFileStatus(
+        error instanceof Error ? error.message : 'Не удалось экспортировать онтологию.',
+      );
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const ontology = await importOntology(file);
+      const graph = mapOntologyToGraph(ontology);
+      setNodes(graph.nodes);
+      setEdges(graph.edges);
+      setMetadata(ontology.metadata);
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      setFileStatus('Онтология импортирована.');
+    } catch (error) {
+      setFileStatus(
+        error instanceof Error ? error.message : 'Не удалось импортировать онтологию.',
+      );
+    } finally {
+      if (importInputRef.current) {
+        importInputRef.current.value = '';
+      }
+    }
+  };
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -146,9 +238,42 @@ function OntologyWorkspace() {
 
   return (
     <div className="welcome-card">
-      <div className="welcome-kicker">OntologyBuilder</div>
       <div className="ontology-workspace__heading">
-        <h2>Рабочая область онтологии</h2>
+        <div className="ontology-workspace__file-actions">
+          <button className="ontology-editor__add" type="button" onClick={handleSave}>
+            <Save size={14} />
+            Сохранить
+          </button>
+          <button className="ontology-editor__add" type="button" onClick={handleLoad}>
+            <FolderOpen size={14} />
+            Загрузить
+          </button>
+          <button className="ontology-editor__add" type="button" onClick={handleExport}>
+            <Download size={14} />
+            Экспорт
+          </button>
+          <button
+            className="ontology-editor__add"
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+          >
+            <Upload size={14} />
+            Импорт
+          </button>
+          <input
+            ref={importInputRef}
+            className="ontology-workspace__file-input"
+            type="file"
+            accept="application/json,.json"
+            aria-label="Импортировать файл онтологии"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                void handleImport(file);
+              }
+            }}
+          />
+        </div>
         <button
           className="ontology-editor__add ontology-workspace__add"
           type="button"
@@ -158,7 +283,11 @@ function OntologyWorkspace() {
           Добавить ноду
         </button>
       </div>
-      <p>Здесь появятся инструменты для построения и редактирования онтологии.</p>
+      {fileStatus && (
+        <p className="ontology-workspace__status" role="status">
+          {fileStatus}
+        </p>
+      )}
       <div className="ontology-workspace">
         <div className="ontology-flow" aria-label="Граф онтологии">
           <ReactFlow

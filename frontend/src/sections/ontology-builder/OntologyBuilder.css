@@ -21,6 +21,23 @@
   gap: 16px;
 }
 
+.ontology-workspace__file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.ontology-workspace__file-input {
+  display: none;
+}
+
+.ontology-workspace__status {
+  margin: 10px 0;
+  color: #548064;
+  font-size: 11px;
+}
+
 .ontology-workspace__heading h2 {
   margin: 0;
   font-size: 18px;
@@ -75,6 +92,21 @@
 .ontology-editor__property-row .ontology-editor__control:nth-child(2) {
   width: 90px;
   flex: none;
+}
+
+.ontology-editor__required {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: #737d74;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.ontology-editor__required input {
+  margin: 0;
+  accent-color: #548064;
 }
 
 .ontology-editor__color {

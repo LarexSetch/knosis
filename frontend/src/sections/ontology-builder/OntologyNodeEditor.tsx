@@ -103,7 +103,7 @@ export function OntologyNodeEditor({
             updateNode({
               properties: [
                 ...node.data.properties,
-                { name: '', type: 'string', description: '' },
+                { name: '', type: 'string', required: false, description: '' },
               ],
             })
           }
@@ -141,6 +141,20 @@ export function OntologyNodeEditor({
                 <option value="number">number</option>
                 <option value="boolean">boolean</option>
               </select>
+              <label
+                className="ontology-editor__required"
+                title="Обязательное свойство"
+              >
+                <input
+                  type="checkbox"
+                  checked={property.required ?? false}
+                  aria-label={`Обязательное свойство ${index + 1}`}
+                  onChange={(event) =>
+                    updateProperty(index, { required: event.target.checked })
+                  }
+                />
+                Обязательное
+              </label>
               <button
                 className="ontology-editor__remove"
                 type="button"

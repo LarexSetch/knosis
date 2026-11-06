@@ -10,6 +10,7 @@ export enum OntologyNodeIcon {
 export interface OntologyProperty {
   name: string;
   type: OntologyPropertyType;
+  required?: boolean;
   description: string;
 }
 
