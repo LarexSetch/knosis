@@ -1,6 +1,5 @@
 import { BookOpenText } from 'lucide-react';
 import { Route, Routes } from 'react-router-dom';
-import { SectionPage } from '../SectionPage';
 
 function DocumentationWorkspace() {
   return (

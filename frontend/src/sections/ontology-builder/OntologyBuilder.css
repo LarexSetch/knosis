@@ -1,0 +1,41 @@
+.ontology-flow {
+  height: clamp(360px, 60vh, 640px);
+  overflow: hidden;
+  border: 1px solid #e7ebe5;
+  border-radius: 9px;
+  background: #fbfcfa;
+}
+
+.ontology-flow .react-flow__node-default {
+  min-width: 150px;
+  padding: 12px 18px;
+  border: 1px solid #cbd9ce;
+  border-radius: 9px;
+  color: #315e49;
+  background: #fff;
+  box-shadow: 0 4px 12px #263b2b0d;
+  font-family: 'Avenir Next', Avenir, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ontology-flow .react-flow__edge-text {
+  fill: #737d74;
+  font-size: 11px;
+}
+
+.ontology-flow .react-flow__edge-textbg {
+  fill: #fbfcfa;
+}
+
+.ontology-flow .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid #e5e9e4;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px #263b2b0d;
+}
+
+.ontology-flow .react-flow__controls-button {
+  border-bottom-color: #e5e9e4;
+  background: #fff;
+}
