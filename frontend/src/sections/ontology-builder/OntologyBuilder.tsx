@@ -3,16 +3,20 @@ import {
   Controls,
   MarkerType,
   ReactFlow,
-  type Edge,
+  useEdgesState,
+  useNodesState,
 } from '@xyflow/react';
+import { useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import './OntologyBuilder.css';
+import { OntologyNode } from './OntologyNode';
+import { OntologyNodeEditor } from './OntologyNodeEditor';
 import {
-  OntologyNode,
-  type OntologyFlowNode,
   OntologyNodeIcon,
-} from './OntologyNode';
+  type OntologyFlowNode,
+  type OntologyRelationship,
+} from './ontology-types';
 
 const nodeTypes = { ontology: OntologyNode };
 
@@ -52,7 +56,7 @@ const initialNodes: OntologyFlowNode[] = [
   },
 ];
 
-const initialEdges: Edge[] = [
+const initialEdges: OntologyRelationship[] = [
   {
     id: 'documentation-ontology',
     source: 'documentation',
@@ -63,22 +67,44 @@ const initialEdges: Edge[] = [
 ];
 
 function OntologyWorkspace() {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+
   return (
     <div className="welcome-card">
       <div className="welcome-kicker">OntologyBuilder</div>
       <h2>Рабочая область онтологии</h2>
       <p>Здесь появятся инструменты для построения и редактирования онтологии.</p>
-      <div className="ontology-flow" aria-label="Граф онтологии">
-        <ReactFlow
-          defaultNodes={initialNodes}
-          defaultEdges={initialEdges}
-          nodeTypes={nodeTypes}
-          nodesDraggable
-          fitView
-        >
-          <Background color="#dce4dc" gap={20} />
-          <Controls />
-        </ReactFlow>
+      <div className="ontology-workspace">
+        <div className="ontology-flow" aria-label="Граф онтологии">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            nodeTypes={nodeTypes}
+            nodesDraggable
+            fitView
+          >
+            <Background color="#dce4dc" gap={20} />
+            <Controls />
+          </ReactFlow>
+        </div>
+        {selectedNode && (
+          <OntologyNodeEditor
+            node={selectedNode}
+            onChange={(data) =>
+              setNodes((currentNodes) =>
+                currentNodes.map((node) =>
+                  node.id === selectedNode.id ? { ...node, data } : node,
+                ),
+              )
+            }
+          />
+        )}
       </div>
     </div>
   );

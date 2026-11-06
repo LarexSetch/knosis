@@ -1,28 +1,9 @@
 import { Network, Unlink } from 'lucide-react';
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-
-export type OntologyPropertyType = 'string' | 'number' | 'boolean';
-
-export enum OntologyNodeIcon {
-  ASSOCIATIONS = 'ASSOCIATIONS',
-  DETACHED = 'DETACHED',
-}
-
-export interface OntologyProperty {
-  name: string;
-  type: OntologyPropertyType;
-  description: string;
-}
-
-export interface OntologyNodeData extends Record<string, unknown> {
-  color: string;
-  name: string;
-  description: string;
-  icons: OntologyNodeIcon[];
-  properties: OntologyProperty[];
-}
-
-export type OntologyFlowNode = Node<OntologyNodeData, 'ontology'>;
+import { Handle, Position, type NodeProps } from '@xyflow/react';
+import {
+  OntologyNodeIcon,
+  type OntologyFlowNode,
+} from './ontology-types';
 
 const iconComponents = {
   [OntologyNodeIcon.ASSOCIATIONS]: { label: 'Связи', Icon: Network },
