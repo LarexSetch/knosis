@@ -1,10 +1,15 @@
 import {
+  addEdge,
   Background,
   Controls,
+  MarkerType,
   ReactFlow,
+  useEdgesState,
   useNodesState,
+  type Connection,
 } from '@xyflow/react';
-import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import './OntologyBuilder.css';
@@ -13,6 +18,7 @@ import { OntologyNodeEditor } from './OntologyNodeEditor';
 import {
   OntologyNodeIcon,
   type OntologyFlowNode,
+  type OntologyRelationship,
 } from './ontology-types';
 
 const nodeTypes = { ontology: OntologyNode };
@@ -22,6 +28,7 @@ const initialNodes: OntologyFlowNode[] = [
     id: 'documentation',
     type: 'ontology',
     draggable: true,
+    deletable: false,
     position: { x: 80, y: 120 },
     data: {
       color: '#548064',
@@ -46,6 +53,7 @@ const initialNodes: OntologyFlowNode[] = [
     id: 'ontology',
     type: 'ontology',
     draggable: true,
+    deletable: false,
     position: { x: 380, y: 120 },
     data: {
       color: '#789a83',
@@ -64,22 +72,100 @@ const initialNodes: OntologyFlowNode[] = [
 
 function OntologyWorkspace() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      setEdges((currentEdges) =>
+        addEdge(
+          {
+            ...connection,
+            id: crypto.randomUUID(),
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#548064',
+            },
+          },
+          currentEdges,
+        ),
+      );
+    },
+    [setEdges],
+  );
+
+  const addNode = () => {
+    const id = crypto.randomUUID();
+    const newNode: OntologyFlowNode = {
+      id,
+      type: 'ontology',
+      deletable: false,
+      position: { x: 100 + nodes.length * 40, y: 240 + nodes.length * 40 },
+      data: {
+        color: '#789a83',
+        name: '',
+        description: '',
+        icons: [OntologyNodeIcon.DETACHED],
+        properties: [],
+        associations: [],
+      },
+    };
+    setNodes((currentNodes) => [...currentNodes, newNode]);
+    setSelectedNodeId(id);
+  };
+
+  const deleteNode = (nodeId: string) => {
+    setNodes((currentNodes) =>
+      currentNodes
+        .filter((node) => node.id !== nodeId)
+        .map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            associations: node.data.associations.map((association) => ({
+              ...association,
+              targets: association.targets.filter((target) => target !== nodeId),
+            })),
+          },
+        })),
+    );
+    setEdges((currentEdges) =>
+      currentEdges.filter(
+        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+      ),
+    );
+    setSelectedNodeId(null);
+  };
 
   return (
     <div className="welcome-card">
       <div className="welcome-kicker">OntologyBuilder</div>
-      <h2>Рабочая область онтологии</h2>
+      <div className="ontology-workspace__heading">
+        <h2>Рабочая область онтологии</h2>
+        <button
+          className="ontology-editor__add ontology-workspace__add"
+          type="button"
+          onClick={addNode}
+        >
+          <Plus size={15} />
+          Добавить ноду
+        </button>
+      </div>
       <p>Здесь появятся инструменты для построения и редактирования онтологии.</p>
       <div className="ontology-workspace">
         <div className="ontology-flow" aria-label="Граф онтологии">
           <ReactFlow
             nodes={nodes}
+            edges={edges}
             onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             nodeTypes={nodeTypes}
             nodesDraggable
+            nodesConnectable
+            deleteKeyCode={null}
             fitView
           >
             <Background color="#dce4dc" gap={20} />
@@ -90,6 +176,7 @@ function OntologyWorkspace() {
           <OntologyNodeEditor
             node={selectedNode}
             availableNodes={nodes}
+            onDelete={() => deleteNode(selectedNode.id)}
             onChange={(data) =>
               setNodes((currentNodes) =>
                 currentNodes.map((node) =>

@@ -9,12 +9,14 @@ import { OntologyNodeIcon } from './ontology-types';
 interface OntologyNodeEditorProps {
   node: OntologyFlowNode;
   availableNodes: OntologyFlowNode[];
+  onDelete: () => void;
   onChange: (data: OntologyNodeData) => void;
 }
 
 export function OntologyNodeEditor({
   node,
   availableNodes,
+  onDelete,
   onChange,
 }: OntologyNodeEditorProps) {
   const updateNode = (updates: Partial<OntologyNodeData>) => {
@@ -53,7 +55,16 @@ export function OntologyNodeEditor({
   return (
     <aside className="ontology-editor" aria-label="Редактирование ноды">
       <div className="ontology-editor__heading">
-        <div className="welcome-kicker">Редактор ноды</div>
+        <div className="ontology-editor__title-row">
+          <div className="welcome-kicker">Редактор ноды</div>
+          <button
+            className="ontology-editor__delete"
+            type="button"
+            onClick={onDelete}
+          >
+            Удалить ноду
+          </button>
+        </div>
         <div className="ontology-editor__node-row">
           <input
             className="ontology-editor__control"
