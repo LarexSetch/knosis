@@ -152,6 +152,40 @@
   background: #fbfcfa;
 }
 
+.ontology-editor__targets-all,
+.ontology-editor__target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #57645a;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ontology-editor__targets-all input,
+.ontology-editor__target input {
+  accent-color: #548064;
+}
+
+.ontology-editor__targets {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.ontology-editor__target--self {
+  color: #315e49;
+}
+
+.ontology-editor__target small {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #315e49;
+  background: #e8f1e9;
+  font-size: 9px;
+  font-weight: 700;
+}
+
 .ontology-editor__empty {
   margin: 0;
   color: #89918a;

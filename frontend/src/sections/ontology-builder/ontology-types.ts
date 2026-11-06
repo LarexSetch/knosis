@@ -13,12 +13,20 @@ export interface OntologyProperty {
   description: string;
 }
 
+export interface OntologyAssociation {
+  relation: string;
+  description: string;
+  targets: string[];
+  targetsAll: boolean;
+}
+
 export interface OntologyNodeData extends Record<string, unknown> {
   color: string;
   name: string;
   description: string;
   icons: OntologyNodeIcon[];
   properties: OntologyProperty[];
+  associations: OntologyAssociation[];
 }
 
 export type OntologyFlowNode = Node<OntologyNodeData, 'ontology'>;

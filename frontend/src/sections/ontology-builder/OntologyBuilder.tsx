@@ -1,9 +1,7 @@
 import {
   Background,
   Controls,
-  MarkerType,
   ReactFlow,
-  useEdgesState,
   useNodesState,
 } from '@xyflow/react';
 import { useState } from 'react';
@@ -15,7 +13,6 @@ import { OntologyNodeEditor } from './OntologyNodeEditor';
 import {
   OntologyNodeIcon,
   type OntologyFlowNode,
-  type OntologyRelationship,
 } from './ontology-types';
 
 const nodeTypes = { ontology: OntologyNode };
@@ -35,6 +32,14 @@ const initialNodes: OntologyFlowNode[] = [
         { name: 'Название', type: 'string', description: 'Название документа.' },
         { name: 'Страниц', type: 'number', description: 'Количество страниц.' },
       ],
+      associations: [
+        {
+          relation: 'DEFINES',
+          description: 'Документация определяет структуру онтологии.',
+          targets: ['ontology'],
+          targetsAll: false,
+        },
+      ],
     },
   },
   {
@@ -52,23 +57,13 @@ const initialNodes: OntologyFlowNode[] = [
         { name: 'Синонимы', type: 'string', description: 'Альтернативные названия.' },
         { name: 'Активна', type: 'boolean', description: 'Признак активности.' },
       ],
+      associations: [],
     },
-  },
-];
-
-const initialEdges: OntologyRelationship[] = [
-  {
-    id: 'documentation-ontology',
-    source: 'documentation',
-    target: 'ontology',
-    label: 'описывает',
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#548064' },
   },
 ];
 
 function OntologyWorkspace() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
 
@@ -81,9 +76,7 @@ function OntologyWorkspace() {
         <div className="ontology-flow" aria-label="Граф онтологии">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
             onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             nodeTypes={nodeTypes}
             nodesDraggable
@@ -96,6 +89,7 @@ function OntologyWorkspace() {
         {selectedNode && (
           <OntologyNodeEditor
             node={selectedNode}
+            availableNodes={nodes}
             onChange={(data) =>
               setNodes((currentNodes) =>
                 currentNodes.map((node) =>
