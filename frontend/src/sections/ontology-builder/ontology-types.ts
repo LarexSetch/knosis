@@ -32,7 +32,9 @@ export interface OntologyNodeData extends Record<string, unknown> {
 export type OntologyFlowNode = Node<OntologyNodeData, 'ontology'>;
 
 export interface OntologyRelationshipData extends Record<string, unknown> {
-  description?: string;
+  relation: string;
+  description: string;
+  properties: OntologyProperty[];
 }
 
 export type OntologyRelationship = Edge<OntologyRelationshipData>;

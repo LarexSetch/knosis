@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css';
 import './OntologyBuilder.css';
 import { OntologyNode } from './OntologyNode';
 import { OntologyNodeEditor } from './OntologyNodeEditor';
+import { OntologyRelationshipEditor } from './OntologyRelationshipEditor';
 import {
   OntologyNodeIcon,
   type OntologyFlowNode,
@@ -74,7 +75,9 @@ function OntologyWorkspace() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+  const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -83,6 +86,8 @@ function OntologyWorkspace() {
           {
             ...connection,
             id: crypto.randomUUID(),
+            label: '',
+            data: { relation: '', description: '', properties: [] },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               color: '#548064',
@@ -136,6 +141,7 @@ function OntologyWorkspace() {
       ),
     );
     setSelectedNodeId(null);
+    setSelectedEdgeId(null);
   };
 
   return (
@@ -161,7 +167,18 @@ function OntologyWorkspace() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onNodeClick={(_, node) => {
+              setSelectedNodeId(node.id);
+              setSelectedEdgeId(null);
+            }}
+            onEdgeClick={(_, edge) => {
+              setSelectedEdgeId(edge.id);
+              setSelectedNodeId(null);
+            }}
+            onPaneClick={() => {
+              setSelectedNodeId(null);
+              setSelectedEdgeId(null);
+            }}
             nodeTypes={nodeTypes}
             nodesDraggable
             nodesConnectable
@@ -172,7 +189,36 @@ function OntologyWorkspace() {
             <Controls />
           </ReactFlow>
         </div>
-        {selectedNode && (
+        {selectedEdge ? (
+          <OntologyRelationshipEditor
+            edge={selectedEdge}
+            nodes={nodes}
+            onChange={(data) =>
+              setEdges((currentEdges) =>
+                currentEdges.map((edge) =>
+                  edge.id === selectedEdge.id
+                    ? { ...edge, data, label: data.relation }
+                    : edge,
+                ),
+              )
+            }
+            onSwap={() =>
+              setEdges((currentEdges) =>
+                currentEdges.map((edge) =>
+                  edge.id === selectedEdge.id
+                    ? {
+                        ...edge,
+                        source: edge.target,
+                        target: edge.source,
+                        sourceHandle: edge.targetHandle,
+                        targetHandle: edge.sourceHandle,
+                      }
+                    : edge,
+                ),
+              )
+            }
+          />
+        ) : selectedNode ? (
           <OntologyNodeEditor
             node={selectedNode}
             availableNodes={nodes}
@@ -185,7 +231,7 @@ function OntologyWorkspace() {
               )
             }
           />
-        )}
+        ) : null}
       </div>
     </div>
   );
