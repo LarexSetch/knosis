@@ -1,0 +1,602 @@
+.documentation-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.documentation-sidebar__heading {
+  padding: 0 8px 3px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.documentation-sidebar__documents {
+  display: grid;
+  gap: 2px;
+}
+
+.documentation-sidebar__row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.documentation-sidebar__document {
+  display: flex;
+  width: auto;
+  min-width: 0;
+  flex: 1;
+  min-height: 36px;
+  justify-content: flex-start;
+  gap: 9px;
+  overflow: hidden;
+  padding: 0 9px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-align: left;
+}
+
+.documentation-sidebar__document:hover,
+.documentation-sidebar__document.is-selected {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.documentation-sidebar__document svg {
+  flex: none;
+}
+
+.documentation-sidebar__document span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentation-sidebar__icon-action {
+  width: 27px;
+  height: 27px;
+  min-height: 27px;
+  flex: none;
+  padding: 0;
+  color: var(--muted-foreground);
+  opacity: 0.75;
+}
+
+.documentation-sidebar__row:hover .documentation-sidebar__icon-action,
+.documentation-sidebar__row:focus-within .documentation-sidebar__icon-action {
+  opacity: 1;
+}
+
+.documentation-sidebar__icon-action--delete:hover {
+  color: #f87171;
+}
+
+.documentation-sidebar__rename-input {
+  width: 0;
+  min-width: 0;
+  height: 34px;
+  flex: 1;
+  padding: 0 8px;
+  border: 1px solid var(--ring);
+  border-radius: 6px;
+  color: var(--foreground);
+  background: var(--background);
+  font-size: 12px;
+  outline: none;
+}
+
+.documentation-sidebar__empty {
+  margin: 0;
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.documentation-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.documentation-page__file-input {
+  display: none;
+}
+
+.documentation-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.documentation-page__add-button {
+  flex: none;
+}
+
+.documentation-page__status {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  background: var(--card);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.documentation-page__body {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  overflow: hidden;
+  padding-top: 24px;
+}
+
+.documentation-editor {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 22%);
+}
+
+.documentation-editor__heading {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.documentation-editor__heading > div {
+  min-width: 0;
+}
+
+.documentation-editor__heading > svg {
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+.documentation-editor__eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.documentation-editor__heading h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentation-editor__canvas {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 10px 14px 18px;
+}
+
+.documentation-editor__mdx:not(.mdxeditor-popup-container) {
+  --basePageBg: var(--popover);
+  --baseBase: var(--card);
+  --baseBgSubtle: var(--background);
+  --baseBg: var(--muted);
+  --baseBgHover: var(--accent);
+  --baseBgActive: var(--accent);
+  --baseLine: var(--border);
+  --baseBorder: var(--border);
+  --baseBorderHover: var(--muted-foreground);
+  --baseSolid: var(--muted-foreground);
+  --baseSolidHover: var(--foreground);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  --accentBase: var(--background);
+  --accentBgSubtle: var(--muted);
+  --accentBg: var(--accent);
+  --accentBgHover: var(--accent);
+  --accentBgActive: var(--accent);
+  --accentLine: var(--border);
+  --accentBorder: var(--border);
+  --accentBorderHover: var(--border);
+  --accentSolid: var(--primary);
+  --accentSolidHover: var(--primary);
+  --accentText: var(--foreground);
+  --accentTextContrast: var(--primary-foreground);
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--foreground);
+  background: transparent;
+}
+
+.documentation-editor__mdx [role="toolbar"] {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.documentation-editor__mdx [role="toolbar"] [role="radio"],
+.documentation-editor__mdx [role="toolbar"] button {
+  border-radius: 6px;
+  color: var(--foreground);
+}
+
+.documentation-editor__mdx [role="toolbar"] [role="radio"]:hover,
+.documentation-editor__mdx [role="toolbar"] button:hover {
+  background: var(--accent);
+}
+
+.documentation-editor__mdx [role="toolbar"] [role="radio"][data-state="on"] {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.documentation-editor__mdx [role="toolbar"] [role="combobox"] {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.documentation-editor__mdx [role="toolbar"] [role="combobox"]:hover,
+.documentation-editor__mdx [role="toolbar"] [role="combobox"]:focus-visible {
+  border-color: var(--ring);
+  outline: none;
+}
+
+.documentation-editor__mdx [role="option"],
+.documentation-editor__mdx [role="menuitem"] {
+  color: var(--popover-foreground);
+  background: var(--popover);
+}
+
+.documentation-editor__mdx [role="option"][data-highlighted],
+.documentation-editor__mdx [role="menuitem"][data-highlighted] {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.documentation-editor__mdx.mdxeditor-popup-container {
+  pointer-events: none;
+}
+
+.documentation-editor__mdx.mdxeditor-popup-container > * {
+  pointer-events: auto;
+}
+
+.documentation-editor__content {
+  min-height: 0;
+  flex: 1;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.documentation-editor__mdx .mdxeditor-root-contenteditable {
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.documentation-editor__mdx.mdxeditor-popup-container {
+  min-height: 0;
+  height: 0;
+  flex: none;
+  overflow: visible;
+}
+
+.documentation-editor__content h1,
+.documentation-editor__content h2,
+.documentation-editor__content h3,
+.documentation-editor__content h4,
+.documentation-editor__content h5,
+.documentation-editor__content h6 {
+  color: var(--foreground);
+  scroll-margin-top: 90px;
+}
+
+.documentation-editor__content p,
+.documentation-editor__content li {
+  color: #d4d4d8;
+}
+
+.documentation-editor__mdx .cm-editor {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: #111113;
+}
+
+.documentation-editor__mdx .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.documentation-editor__mdx .cm-gutters {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  background: #18181b;
+}
+
+.documentation-editor__mdx .cm-activeLine,
+.documentation-editor__mdx .cm-activeLineGutter {
+  background: rgb(255 255 255 / 5%);
+}
+
+.documentation-editor__mdx .cm-cursor {
+  border-left-color: var(--foreground);
+}
+
+.documentation-editor__mdx .cm-selectionBackground {
+  background: #3f3f46 !important;
+}
+
+.documentation-editor__mdx .tok-keyword,
+.documentation-editor__mdx .tok-operator,
+.documentation-editor__mdx .tok-atom {
+  color: #c4b5fd;
+}
+
+.documentation-editor__mdx .tok-string,
+.documentation-editor__mdx .tok-regexp {
+  color: #86efac;
+}
+
+.documentation-editor__mdx .tok-number,
+.documentation-editor__mdx .tok-bool {
+  color: #fdba74;
+}
+
+.documentation-editor__mdx .tok-comment {
+  color: #71717a;
+}
+
+.documentation-editor__mdx .tok-function,
+.documentation-editor__mdx .tok-variableName,
+.documentation-editor__mdx .tok-propertyName {
+  color: #93c5fd;
+}
+
+.documentation-outline {
+  position: sticky;
+  top: 24px;
+  max-height: 100%;
+  overflow: auto;
+  padding: 15px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+}
+
+.documentation-outline__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 11px;
+  color: var(--muted-foreground);
+}
+
+.documentation-outline__heading h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.documentation-outline__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.documentation-outline__list .documentation-outline__list {
+  margin-left: 12px;
+  padding-left: 7px;
+  border-left: 1px solid var(--border);
+}
+
+.documentation-outline__row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.documentation-outline__toggle,
+.documentation-outline__toggle-spacer {
+  display: grid;
+  width: 18px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+}
+
+.documentation-outline__toggle {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+
+.documentation-outline__toggle:hover,
+.documentation-outline__toggle:focus-visible {
+  color: var(--foreground);
+  background: var(--accent);
+  outline: none;
+}
+
+.documentation-outline__item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 5px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.documentation-outline__item:hover,
+.documentation-outline__item:focus-visible {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.documentation-outline__item > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.documentation-outline__level {
+  flex: none;
+  color: #71717a;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.documentation-outline__empty {
+  margin: 0;
+  padding: 2px 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.documentation-page__empty {
+  display: flex;
+  min-height: 360px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.documentation-page__empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+
+.documentation-page__empty h2 {
+  margin: 17px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.documentation-page__empty p {
+  max-width: 410px;
+  margin: 8px 0 18px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .documentation-page__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 1fr) auto;
+    overflow-y: auto;
+  }
+
+  .documentation-outline {
+    position: relative;
+    top: auto;
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 760px) {
+  .documentation-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .documentation-page__body {
+    min-height: 0;
+    flex: none;
+    grid-template-rows: minmax(420px, 65dvh) auto;
+    overflow: visible;
+  }
+
+  .documentation-editor {
+    height: min(65dvh, 640px);
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 600px) {
+  .documentation-page__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .documentation-page__add-button {
+    width: 100%;
+  }
+
+  .documentation-page__body {
+    gap: 14px;
+    padding-top: 18px;
+  }
+
+  .documentation-editor__heading {
+    padding: 14px;
+  }
+
+  .documentation-editor__canvas {
+    min-height: 420px;
+    padding: 8px 8px 14px;
+  }
+
+}
