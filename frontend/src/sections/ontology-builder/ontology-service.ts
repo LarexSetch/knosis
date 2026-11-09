@@ -11,85 +11,263 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function isOntologyProperty(value: unknown): value is OntologyDocumentProperty {
-  return (
-    isRecord(value) &&
-    typeof value.name === 'string' &&
-    (value.type === 'string' ||
-      value.type === 'number' ||
-      value.type === 'boolean') &&
-    typeof value.required === 'boolean' &&
-    typeof value.description === 'string'
-  );
+function summarizeValue(value: unknown): string {
+  if (value === undefined) {
+    return 'отсутствует';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  if (typeof value === 'string') {
+    const summary = JSON.stringify(value);
+    return summary.length > 82 ? `${summary.slice(0, 79)}...` : summary;
+  }
+  if (Array.isArray(value)) {
+    return `массив (${value.length} элементов)`;
+  }
+  if (isRecord(value)) {
+    return 'объект';
+  }
+  return String(value);
 }
 
-function isOntologyNode(value: unknown): value is OntologyDocumentNode {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.color === 'string' &&
-    typeof value.description === 'string' &&
-    Array.isArray(value.properties) &&
-    value.properties.every(isOntologyProperty)
-  );
-}
-
-function isOntologyRelationship(
+function validateRecord(
   value: unknown,
-): value is OntologyDocumentRelationship {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    (value.type === 'association' || value.type === 'relation') &&
-    typeof value.sourceNodeId === 'string' &&
-    typeof value.targetNodeId === 'string' &&
-    typeof value.relationName === 'string' &&
-    typeof value.description === 'string' &&
-    Array.isArray(value.properties) &&
-    value.properties.every(isOntologyProperty)
-  );
+  path: string,
+  errors: string[],
+): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    errors.push(`${path}: ожидался объект, получено ${summarizeValue(value)}.`);
+    return false;
+  }
+  return true;
 }
 
-function isOntologyDocument(value: unknown): value is OntologyDocument {
-  if (!isRecord(value) || !isRecord(value.metadata)) {
+function validateStringField(
+  record: Record<string, unknown>,
+  field: string,
+  path: string,
+  errors: string[],
+): boolean {
+  if (typeof record[field] !== 'string') {
+    errors.push(
+      `${path}.${field}: ожидалась строка, получено ${summarizeValue(record[field])}.`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function validateOptionalStringField(
+  record: Record<string, unknown>,
+  field: string,
+  path: string,
+  errors: string[],
+): boolean {
+  if (record[field] === undefined) {
+    return true;
+  }
+  return validateStringField(record, field, path, errors);
+}
+
+function validateProperty(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is OntologyDocumentProperty {
+  if (!validateRecord(value, path, errors)) {
     return false;
   }
 
-  const metadata = value.metadata;
-  if (
-    typeof metadata.name !== 'string' ||
-    typeof metadata.version !== 'string' ||
-    typeof metadata.generatedAt !== 'string' ||
-    !Array.isArray(value.nodes) ||
-    !Array.isArray(value.relationships)
-  ) {
+  const record = value;
+  let valid = true;
+  valid = validateStringField(record, 'name', path, errors) && valid;
+  valid =
+    (record.type === 'string' ||
+      record.type === 'number' ||
+      record.type === 'boolean' ||
+      record.type === 'array')
+      ? valid
+      : (errors.push(
+          `${path}.type: ожидалось "string", "number", "boolean" или "array", получено ${summarizeValue(record.type)}.`,
+        ),
+        false);
+  valid =
+    typeof record.required === 'boolean'
+      ? valid
+      : (errors.push(
+          `${path}.required: ожидался boolean, получено ${summarizeValue(record.required)}.`,
+        ),
+        false);
+  valid = validateOptionalStringField(record, 'description', path, errors) && valid;
+  return valid;
+}
+
+function validateNode(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is OntologyDocumentNode {
+  if (!validateRecord(value, path, errors)) {
     return false;
   }
 
-  const nodes = value.nodes.filter(isOntologyNode);
-  const relationships = value.relationships.filter(isOntologyRelationship);
-  if (
-    nodes.length !== value.nodes.length ||
-    relationships.length !== value.relationships.length
-  ) {
+  const record = value;
+  let valid = true;
+  valid = validateStringField(record, 'id', path, errors) && valid;
+  valid = validateStringField(record, 'name', path, errors) && valid;
+  valid = validateStringField(record, 'color', path, errors) && valid;
+  valid = validateOptionalStringField(record, 'description', path, errors) && valid;
+
+  if (!Array.isArray(record.properties)) {
+    errors.push(
+      `${path}.properties: ожидался массив, получено ${summarizeValue(record.properties)}.`,
+    );
     return false;
+  }
+
+  record.properties.forEach((property, index) => {
+    valid = validateProperty(property, `${path}.properties[${index}]`, errors) && valid;
+  });
+  return valid;
+}
+
+function validateRelationship(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is OntologyDocumentRelationship {
+  if (!validateRecord(value, path, errors)) {
+    return false;
+  }
+
+  const record = value;
+  let valid = true;
+  valid = validateStringField(record, 'id', path, errors) && valid;
+  valid =
+    record.type === 'association' || record.type === 'relation'
+      ? valid
+      : (errors.push(
+          `${path}.type: ожидалось "association" или "relation", получено ${summarizeValue(record.type)}.`,
+        ),
+        false);
+  valid = validateStringField(record, 'sourceNodeId', path, errors) && valid;
+  valid = validateStringField(record, 'targetNodeId', path, errors) && valid;
+  valid = validateStringField(record, 'relationName', path, errors) && valid;
+  valid = validateOptionalStringField(record, 'description', path, errors) && valid;
+
+  if (!Array.isArray(record.properties)) {
+    errors.push(
+      `${path}.properties: ожидался массив, получено ${summarizeValue(record.properties)}.`,
+    );
+    return false;
+  }
+
+  record.properties.forEach((property, index) => {
+    valid = validateProperty(property, `${path}.properties[${index}]`, errors) && valid;
+  });
+  return valid;
+}
+
+function validateOntologyDocument(
+  value: unknown,
+  errors: string[],
+): value is OntologyDocument {
+  if (!validateRecord(value, '$', errors)) {
+    return false;
+  }
+
+  const root = value;
+  if (!validateRecord(root.metadata, '$.metadata', errors)) {
+    return false;
+  }
+  const metadata = root.metadata;
+  validateStringField(metadata, 'name', '$.metadata', errors);
+  validateStringField(metadata, 'version', '$.metadata', errors);
+  validateStringField(metadata, 'generatedAt', '$.metadata', errors);
+
+  let nodes: OntologyDocumentNode[] = [];
+  if (!Array.isArray(root.nodes)) {
+    errors.push(
+      `$.nodes: ожидался массив, получено ${summarizeValue(root.nodes)}.`,
+    );
+  } else {
+    nodes = root.nodes.filter((node, index) =>
+      validateNode(node, `$.nodes[${index}]`, errors),
+    );
+  }
+
+  let relationships: OntologyDocumentRelationship[] = [];
+  if (!Array.isArray(root.relationships)) {
+    errors.push(
+      `$.relationships: ожидался массив, получено ${summarizeValue(root.relationships)}.`,
+    );
+  } else {
+    relationships = root.relationships.filter((relationship, index) =>
+      validateRelationship(
+        relationship,
+        `$.relationships[${index}]`,
+        errors,
+      ),
+    );
   }
 
   const nodeIds = new Set(nodes.map((node) => node.id));
-  return relationships.every(
-    (relationship) =>
-      nodeIds.has(relationship.sourceNodeId) &&
-      nodeIds.has(relationship.targetNodeId),
-  );
+  relationships.forEach((relationship, index) => {
+    if (!nodeIds.has(relationship.sourceNodeId)) {
+      errors.push(
+        `$.relationships[${index}].sourceNodeId: нода "${relationship.sourceNodeId}" отсутствует в $.nodes.`,
+      );
+    }
+    if (!nodeIds.has(relationship.targetNodeId)) {
+      errors.push(
+        `$.relationships[${index}].targetNodeId: нода "${relationship.targetNodeId}" отсутствует в $.nodes.`,
+      );
+    }
+  });
+
+  if (errors.length > 0) {
+    return false;
+  }
+
+  return true;
 }
 
 function parseOntology(json: string): OntologyDocument {
-  const parsed: unknown = JSON.parse(json);
-  if (!isOntologyDocument(parsed)) {
-    throw new Error('Файл не соответствует формату онтологии.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch (error) {
+    throw new Error(
+      `Некорректный JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  return parsed;
+
+  const errors: string[] = [];
+  if (!validateOntologyDocument(parsed, errors)) {
+    throw new Error(
+      `Файл не соответствует формату онтологии:\n${errors.map((issue) => `• ${issue}`).join('\n')}`,
+    );
+  }
+  return {
+    ...parsed,
+    nodes: parsed.nodes.map((node) => ({
+      ...node,
+      description: node.description ?? '',
+      properties: node.properties.map((property) => ({
+        ...property,
+        description: property.description ?? '',
+      })),
+    })),
+    relationships: parsed.relationships.map((relationship) => ({
+      ...relationship,
+      description: relationship.description ?? '',
+      properties: relationship.properties.map((property) => ({
+        ...property,
+        description: property.description ?? '',
+      })),
+    })),
+  };
 }
 
 export function saveOntology(ontology: OntologyDocument): void {

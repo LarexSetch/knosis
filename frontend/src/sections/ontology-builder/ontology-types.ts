@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-export type OntologyPropertyType = 'string' | 'number' | 'boolean';
+export type OntologyPropertyType = 'string' | 'number' | 'boolean' | 'array';
 
 export enum OntologyNodeIcon {
   ASSOCIATIONS = 'ASSOCIATIONS',

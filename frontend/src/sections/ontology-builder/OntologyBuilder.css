@@ -34,6 +34,7 @@
 
 .ontology-workspace__status {
   margin: 10px 0;
+  white-space: pre-line;
   color: #548064;
   font-size: 11px;
 }
