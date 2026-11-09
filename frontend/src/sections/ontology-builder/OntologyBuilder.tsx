@@ -9,9 +9,10 @@ import {
   type Connection,
 } from '@xyflow/react';
 import { Download, FolderOpen, Plus, Save, Upload } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Route, Routes, useOutletContext } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
+import type { AppLayoutContext, SidebarAction } from '../../components/AppLayout';
 import './OntologyBuilder.css';
 import { OntologyNode } from './OntologyNode';
 import { OntologyNodeEditor } from './OntologyNodeEditor';
@@ -43,7 +44,7 @@ const initialNodes: OntologyFlowNode[] = [
     deletable: false,
     position: { x: 80, y: 120 },
     data: {
-      color: '#548064',
+      color: '#a1a1aa',
       name: 'Документация',
       description: 'Документ, содержащий исходную информацию для построения онтологии.',
       icons: [OntologyNodeIcon.ASSOCIATIONS],
@@ -83,6 +84,7 @@ const initialNodes: OntologyFlowNode[] = [
 ];
 
 function OntologyWorkspace() {
+  const { setSidebarActions } = useOutletContext<AppLayoutContext>();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>([]);
   const [metadata, setMetadata] = useState<OntologyMetadata>(() => ({
@@ -236,133 +238,129 @@ function OntologyWorkspace() {
     setSelectedEdgeId(null);
   };
 
+  const sidebarHandlersRef = useRef({
+    handleSave,
+    handleLoad,
+    handleExport,
+    openImport: () => importInputRef.current?.click(),
+    addNode,
+  });
+  sidebarHandlersRef.current = {
+    handleSave,
+    handleLoad,
+    handleExport,
+    openImport: () => importInputRef.current?.click(),
+    addNode,
+  };
+
+  useEffect(() => {
+    const actions: SidebarAction[] = [
+      { label: 'Сохранить', icon: Save, onClick: () => sidebarHandlersRef.current.handleSave() },
+      { label: 'Загрузить', icon: FolderOpen, onClick: () => sidebarHandlersRef.current.handleLoad() },
+      { label: 'Экспорт', icon: Download, onClick: () => sidebarHandlersRef.current.handleExport() },
+      { label: 'Импорт', icon: Upload, onClick: () => sidebarHandlersRef.current.openImport() },
+      { label: 'Добавить ноду', icon: Plus, onClick: () => sidebarHandlersRef.current.addNode() },
+    ];
+    setSidebarActions(actions);
+    return () => setSidebarActions([]);
+  }, [setSidebarActions]);
+
   return (
-    <div className="welcome-card">
-      <div className="ontology-workspace__heading">
-        <div className="ontology-workspace__file-actions">
-          <button className="ontology-editor__add" type="button" onClick={handleSave}>
-            <Save size={14} />
-            Сохранить
-          </button>
-          <button className="ontology-editor__add" type="button" onClick={handleLoad}>
-            <FolderOpen size={14} />
-            Загрузить
-          </button>
-          <button className="ontology-editor__add" type="button" onClick={handleExport}>
-            <Download size={14} />
-            Экспорт
-          </button>
-          <button
-            className="ontology-editor__add"
-            type="button"
-            onClick={() => importInputRef.current?.click()}
-          >
-            <Upload size={14} />
-            Импорт
-          </button>
-          <input
-            ref={importInputRef}
-            className="ontology-workspace__file-input"
-            type="file"
-            accept="application/json,.json"
-            aria-label="Импортировать файл онтологии"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                void handleImport(file);
+      <div className="ontology-workspace-page">
+        <input
+          ref={importInputRef}
+          className="ontology-workspace__file-input"
+          type="file"
+          accept="application/json,.json"
+          aria-label="Импортировать файл онтологии"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void handleImport(file);
+            }
+          }}
+        />
+        {fileStatus && (
+          <p className="ontology-workspace__status" role="status">
+            {fileStatus}
+          </p>
+        )}
+        <div className="ontology-workspace">
+          <div className="ontology-flow" aria-label="Граф онтологии">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onInit={(instance) => void instance.fitView({ padding: 0.2 })}
+              onNodeClick={(_, node) => {
+                setSelectedNodeId(node.id);
+                setSelectedEdgeId(null);
+              }}
+              onEdgeClick={(_, edge) => {
+                setSelectedEdgeId(edge.id);
+                setSelectedNodeId(null);
+              }}
+              onPaneClick={() => {
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
+              }}
+              nodeTypes={nodeTypes}
+              nodesDraggable
+              nodesConnectable
+              deleteKeyCode={null}
+              fitView
+            >
+              <Background color="#27272a" gap={20} />
+              <Controls />
+            </ReactFlow>
+          </div>
+          {selectedEdge ? (
+            <OntologyRelationshipEditor
+              edge={selectedEdge}
+              nodes={nodes}
+              onChange={(data) =>
+                setEdges((currentEdges) =>
+                  currentEdges.map((edge) =>
+                    edge.id === selectedEdge.id
+                      ? { ...edge, data, label: data.relation }
+                      : edge,
+                  ),
+                )
               }
-            }}
-          />
+              onSwap={() =>
+                setEdges((currentEdges) =>
+                  currentEdges.map((edge) =>
+                    edge.id === selectedEdge.id
+                      ? {
+                          ...edge,
+                          source: edge.target,
+                          target: edge.source,
+                          sourceHandle: edge.targetHandle,
+                          targetHandle: edge.sourceHandle,
+                        }
+                      : edge,
+                  ),
+                )
+              }
+            />
+          ) : selectedNode ? (
+            <OntologyNodeEditor
+              node={selectedNode}
+              availableNodes={nodes}
+              onDelete={() => deleteNode(selectedNode.id)}
+              onChange={(data) =>
+                setNodes((currentNodes) =>
+                  currentNodes.map((node) =>
+                    node.id === selectedNode.id ? { ...node, data } : node,
+                  ),
+                )
+              }
+            />
+          ) : null}
         </div>
-        <button
-          className="ontology-editor__add ontology-workspace__add"
-          type="button"
-          onClick={addNode}
-        >
-          <Plus size={15} />
-          Добавить ноду
-        </button>
       </div>
-      {fileStatus && (
-        <p className="ontology-workspace__status" role="status">
-          {fileStatus}
-        </p>
-      )}
-      <div className="ontology-workspace">
-        <div className="ontology-flow" aria-label="Граф онтологии">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => {
-              setSelectedNodeId(node.id);
-              setSelectedEdgeId(null);
-            }}
-            onEdgeClick={(_, edge) => {
-              setSelectedEdgeId(edge.id);
-              setSelectedNodeId(null);
-            }}
-            onPaneClick={() => {
-              setSelectedNodeId(null);
-              setSelectedEdgeId(null);
-            }}
-            nodeTypes={nodeTypes}
-            nodesDraggable
-            nodesConnectable
-            deleteKeyCode={null}
-            fitView
-          >
-            <Background color="#dce4dc" gap={20} />
-            <Controls />
-          </ReactFlow>
-        </div>
-        {selectedEdge ? (
-          <OntologyRelationshipEditor
-            edge={selectedEdge}
-            nodes={nodes}
-            onChange={(data) =>
-              setEdges((currentEdges) =>
-                currentEdges.map((edge) =>
-                  edge.id === selectedEdge.id
-                    ? { ...edge, data, label: data.relation }
-                    : edge,
-                ),
-              )
-            }
-            onSwap={() =>
-              setEdges((currentEdges) =>
-                currentEdges.map((edge) =>
-                  edge.id === selectedEdge.id
-                    ? {
-                        ...edge,
-                        source: edge.target,
-                        target: edge.source,
-                        sourceHandle: edge.targetHandle,
-                        targetHandle: edge.sourceHandle,
-                      }
-                    : edge,
-                ),
-              )
-            }
-          />
-        ) : selectedNode ? (
-          <OntologyNodeEditor
-            node={selectedNode}
-            availableNodes={nodes}
-            onDelete={() => deleteNode(selectedNode.id)}
-            onChange={(data) =>
-              setNodes((currentNodes) =>
-                currentNodes.map((node) =>
-                  node.id === selectedNode.id ? { ...node, data } : node,
-                ),
-              )
-            }
-          />
-        ) : null}
-      </div>
-    </div>
   );
 }
 

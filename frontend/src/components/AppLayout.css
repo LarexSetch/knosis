@@ -1,0 +1,247 @@
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  height: 100dvh;
+  background: var(--background);
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  width: 272px;
+  height: 100dvh;
+  flex: none;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px 12px 12px;
+  border-right: 1px solid var(--border);
+  background: #101012;
+}
+
+.app-sidebar__workspace {
+  width: 100%;
+  height: 58px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.app-sidebar__workspace:hover {
+  background: var(--accent);
+}
+
+.app-sidebar__brand-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.app-sidebar__workspace-copy,
+.app-sidebar__profile-copy,
+.app-sidebar__app-menu-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.app-sidebar__workspace-copy strong,
+.app-sidebar__profile-copy strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar__workspace-copy > span,
+.app-sidebar__profile-copy > span {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar__workspace-chevron,
+.app-sidebar__profile-icon {
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+.app-sidebar__app-menu {
+  width: 292px;
+}
+
+.app-sidebar__app-menu-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-sidebar__app-menu-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.app-sidebar__app-menu-copy {
+  gap: 3px;
+}
+
+.app-sidebar__content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 24px;
+  overflow-y: auto;
+  padding: 0 4px;
+}
+
+.app-sidebar__tools {
+  display: grid;
+  gap: 3px;
+}
+
+.app-sidebar__action {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.app-sidebar__action:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.app-sidebar__action > svg {
+  flex: none;
+}
+
+.app-sidebar__action {
+  height: 38px;
+}
+
+.app-sidebar__profile {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 7px 3px;
+  border-top: 1px solid var(--border);
+}
+
+.app-sidebar__avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--primary-foreground);
+  background: #52525b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-sidebar__profile-copy {
+  gap: 3px;
+}
+
+.app-main {
+  min-width: 0;
+  height: 100dvh;
+  flex: 1;
+  overflow: auto;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    flex: none;
+    gap: 12px;
+    padding: 9px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-sidebar__workspace {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .app-sidebar__workspace-copy {
+    flex: none;
+  }
+
+  .app-sidebar__content {
+    overflow: visible;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .app-sidebar__tools {
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+  }
+
+  .app-sidebar__tools .app-sidebar__section-label {
+    display: none;
+  }
+
+  .app-sidebar__action {
+    width: auto;
+    min-width: max-content;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 9px;
+    font-size: 12px;
+  }
+
+  .app-sidebar__profile {
+    display: none;
+  }
+
+  .app-main {
+    min-height: 0;
+    height: auto;
+    flex: 1;
+    overflow: visible;
+  }
+}

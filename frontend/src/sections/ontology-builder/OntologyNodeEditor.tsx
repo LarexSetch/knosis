@@ -1,4 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Textarea } from '../../components/ui/textarea';
 import type {
   OntologyAssociation,
   OntologyFlowNode,
@@ -57,16 +60,18 @@ export function OntologyNodeEditor({
       <div className="ontology-editor__heading">
         <div className="ontology-editor__title-row">
           <div className="welcome-kicker">Редактор ноды</div>
-          <button
-            className="ontology-editor__delete"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-300 hover:text-red-200"
             type="button"
             onClick={onDelete}
           >
             Удалить ноду
-          </button>
+          </Button>
         </div>
         <div className="ontology-editor__node-row">
-          <input
+          <Input
             className="ontology-editor__control"
             aria-label="Название ноды"
             value={node.data.name}
@@ -84,7 +89,7 @@ export function OntologyNodeEditor({
       </div>
 
       <div className="ontology-editor__field">
-        <textarea
+        <Textarea
           className="ontology-editor__control"
           aria-label="Описание ноды"
           value={node.data.description}
@@ -96,8 +101,9 @@ export function OntologyNodeEditor({
 
       <div className="ontology-editor__properties-heading">
         <span>Свойства</span>
-        <button
-          className="ontology-editor__add"
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={() =>
             updateNode({
@@ -110,14 +116,14 @@ export function OntologyNodeEditor({
         >
           <Plus size={14} />
           Добавить
-        </button>
+        </Button>
       </div>
 
       <div className="ontology-editor__properties">
         {node.data.properties.map((property, index) => (
           <section className="ontology-editor__property" key={index}>
             <div className="ontology-editor__property-row">
-              <input
+              <Input
                 className="ontology-editor__control"
                 aria-label={`Имя свойства ${index + 1}`}
                 value={property.name}
@@ -155,8 +161,10 @@ export function OntologyNodeEditor({
                 />
                 Обязательное
               </label>
-              <button
-                className="ontology-editor__remove"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground"
                 type="button"
                 aria-label={`Удалить свойство ${property.name || index + 1}`}
                 onClick={() =>
@@ -168,10 +176,10 @@ export function OntologyNodeEditor({
                 }
               >
                 <Trash2 size={14} />
-              </button>
+              </Button>
             </div>
             <div className="ontology-editor__field">
-              <textarea
+              <Textarea
                 className="ontology-editor__control"
                 aria-label={`Описание свойства ${index + 1}`}
                 value={property.description}
@@ -191,8 +199,9 @@ export function OntologyNodeEditor({
 
       <div className="ontology-editor__properties-heading">
         <span>Ассоциации</span>
-        <button
-          className="ontology-editor__add"
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={() =>
             updateNode({
@@ -205,14 +214,14 @@ export function OntologyNodeEditor({
         >
           <Plus size={14} />
           Добавить
-        </button>
+        </Button>
       </div>
 
       <div className="ontology-editor__properties">
         {node.data.associations.map((association, index) => (
           <section className="ontology-editor__property" key={index}>
             <div className="ontology-editor__property-row">
-              <input
+              <Input
                 className="ontology-editor__control"
                 aria-label={`Тип связи ${index + 1}`}
                 value={association.relation}
@@ -221,8 +230,10 @@ export function OntologyNodeEditor({
                 }
                 placeholder="Связь, например DEFINES"
               />
-              <button
-                className="ontology-editor__remove"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground"
                 type="button"
                 aria-label={`Удалить ассоциацию ${association.relation || index + 1}`}
                 onClick={() =>
@@ -234,9 +245,9 @@ export function OntologyNodeEditor({
                 }
               >
                 <Trash2 size={14} />
-              </button>
+              </Button>
             </div>
-            <textarea
+            <Textarea
               className="ontology-editor__control"
               aria-label={`Описание связи ${index + 1}`}
               value={association.description}
