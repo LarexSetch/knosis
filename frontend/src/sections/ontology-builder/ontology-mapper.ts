@@ -97,7 +97,8 @@ export function mapGraphToOntology(
       name: node.data.name,
       color: node.data.color,
       description: node.data.description,
-      position: { ...node.position },
+      positionX: node.position.x,
+      positionY: node.position.y,
       properties: node.data.properties.map(mapPropertyToDocument),
     })),
     relationships,
@@ -177,22 +178,39 @@ export function mapOntologyToGraph(ontology: OntologyDocument): {
     });
   }
 
+  const connectedNodeIds = new Set(
+    edges.flatMap((edge) => [edge.source, edge.target]),
+  );
+  for (const [sourceNodeId, associations] of associationsByNode) {
+    if (associations.length > 0) {
+      connectedNodeIds.add(sourceNodeId);
+      associations.forEach((association) =>
+        association.targets.forEach((targetNodeId) =>
+          connectedNodeIds.add(targetNodeId),
+        ),
+      );
+    }
+  }
+
   const nodes: OntologyFlowNode[] = ontology.nodes.map((node, index) => {
     const associations = associationsByNode.get(node.id) ?? [];
+    const defaultPosition = getNodePosition(index);
     return {
       id: node.id,
       type: 'ontology',
       draggable: true,
       deletable: false,
-      position: node.position ?? getNodePosition(index),
+      position: {
+        x: node.positionX ?? defaultPosition.x,
+        y: node.positionY ?? defaultPosition.y,
+      },
       data: {
         color: node.color || DEFAULT_NODE_COLOR,
         name: node.name,
         description: node.description,
-        icons:
-          associations.length > 0
-            ? [OntologyNodeIcon.ASSOCIATIONS]
-            : [OntologyNodeIcon.DETACHED],
+        icons: connectedNodeIds.has(node.id)
+          ? [OntologyNodeIcon.ASSOCIATIONS]
+          : [OntologyNodeIcon.DETACHED],
         properties: node.properties.map(mapDocumentToProperty),
         associations,
       },

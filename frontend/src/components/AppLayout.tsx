@@ -7,7 +7,7 @@ import {
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import {
@@ -48,13 +48,18 @@ export interface SidebarAction {
 
 export interface AppLayoutContext {
   setSidebarActions: (actions: SidebarAction[]) => void;
+  setSidebarContent: (content: ReactNode | null) => void;
 }
 
 export function AppLayout() {
   const { pathname } = useLocation();
   const currentSection = sections.find(({ to }) => pathname.startsWith(to)) ?? sections[0];
   const [sidebarActions, setSidebarActions] = useState<SidebarAction[]>([]);
+  const [sidebarContent, setSidebarContent] = useState<ReactNode>(null);
   const isOntologyBuilder = pathname.startsWith('/ontology-builder');
+  const updateSidebarContent = useCallback((content: ReactNode | null) => {
+    setSidebarContent(content);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -114,6 +119,7 @@ export function AppLayout() {
               ))}
             </section>
           )}
+          {sidebarContent}
         </div>
 
         <div className="app-sidebar__profile">
@@ -127,7 +133,7 @@ export function AppLayout() {
       </aside>
 
       <main className="app-main" aria-label={currentSection.label}>
-        <Outlet context={{ setSidebarActions } satisfies AppLayoutContext} />
+        <Outlet context={{ setSidebarActions, setSidebarContent: updateSidebarContent } satisfies AppLayoutContext} />
       </main>
     </div>
   );

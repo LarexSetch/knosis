@@ -2,7 +2,7 @@ import { Network, Unlink } from 'lucide-react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   OntologyNodeIcon,
-  type OntologyFlowNode,
+  type OntologyNodeData,
 } from './ontology-types';
 
 const iconComponents = {
@@ -10,7 +10,39 @@ const iconComponents = {
   [OntologyNodeIcon.DETACHED]: { label: 'Изолированная', Icon: Unlink },
 } satisfies Record<OntologyNodeIcon, { label: string; Icon: typeof Network }>;
 
-export function OntologyNode({ data }: NodeProps<OntologyFlowNode>) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isOntologyNodeData(
+  data: Record<string, unknown>,
+): data is OntologyNodeData {
+  return (
+    typeof data.color === 'string' &&
+    typeof data.name === 'string' &&
+    typeof data.description === 'string' &&
+    Array.isArray(data.icons) &&
+    data.icons.every(
+      (icon) =>
+        icon === OntologyNodeIcon.ASSOCIATIONS ||
+        icon === OntologyNodeIcon.DETACHED,
+    ) &&
+    Array.isArray(data.properties) &&
+    data.properties.every(
+      (property) =>
+        isRecord(property) &&
+        typeof property.name === 'string' &&
+        typeof property.type === 'string',
+    ) &&
+    Array.isArray(data.associations)
+  );
+}
+
+export function OntologyNode({ data }: NodeProps) {
+  if (!isOntologyNodeData(data)) {
+    return null;
+  }
+
   return (
     <article className="ontology-node">
       <Handle type="target" position={Position.Left} />

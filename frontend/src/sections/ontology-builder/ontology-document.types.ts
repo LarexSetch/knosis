@@ -1,4 +1,3 @@
-import type { XYPosition } from '@xyflow/react';
 import type { OntologyPropertyType } from './ontology-types';
 
 export type OntologyRelationshipType = 'association' | 'relation';
@@ -21,7 +20,8 @@ export interface OntologyDocumentNode {
   name: string;
   color: string;
   description: string;
-  position?: XYPosition;
+  positionX?: number;
+  positionY?: number;
   properties: OntologyDocumentProperty[];
 }
 

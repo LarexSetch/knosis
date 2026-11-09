@@ -118,6 +118,19 @@ function validateNode(
   valid = validateStringField(record, 'name', path, errors) && valid;
   valid = validateStringField(record, 'color', path, errors) && valid;
   valid = validateOptionalStringField(record, 'description', path, errors) && valid;
+  for (const coordinate of ['positionX', 'positionY'] as const) {
+    if (
+      record[coordinate] !== undefined &&
+      (typeof record[coordinate] !== 'number' ||
+        !Number.isFinite(record[coordinate]))
+    ) {
+      errors.push(
+        `${path}.${coordinate}: ожидалось конечное число, получено ${summarizeValue(record[coordinate])}.`,
+      );
+      valid = false;
+    }
+  }
+
   if (record.position !== undefined) {
     if (!isRecord(record.position)) {
       errors.push(
@@ -126,7 +139,10 @@ function validateNode(
       valid = false;
     } else {
       for (const axis of ['x', 'y'] as const) {
-        if (typeof record.position[axis] !== 'number' || !Number.isFinite(record.position[axis])) {
+        if (
+          typeof record.position[axis] !== 'number' ||
+          !Number.isFinite(record.position[axis])
+        ) {
           errors.push(
             `${path}.position.${axis}: ожидалось конечное число, получено ${summarizeValue(record.position[axis])}.`,
           );
@@ -266,16 +282,25 @@ function parseOntology(json: string): OntologyDocument {
       `Файл не соответствует формату онтологии:\n${errors.map((issue) => `• ${issue}`).join('\n')}`,
     );
   }
+  type LegacyOntologyNode = OntologyDocumentNode & {
+    position?: { x: number; y: number };
+  };
   return {
     ...parsed,
-    nodes: parsed.nodes.map((node) => ({
-      ...node,
-      description: node.description ?? '',
-      properties: node.properties.map((property) => ({
-        ...property,
-        description: property.description ?? '',
-      })),
-    })),
+    nodes: parsed.nodes.map((node) => {
+      const { position, ...nodeWithoutLegacyPosition } =
+        node as LegacyOntologyNode;
+      return {
+        ...nodeWithoutLegacyPosition,
+        positionX: node.positionX ?? position?.x,
+        positionY: node.positionY ?? position?.y,
+        description: node.description ?? '',
+        properties: node.properties.map((property) => ({
+          ...property,
+          description: property.description ?? '',
+        })),
+      };
+    }),
     relationships: parsed.relationships.map((relationship) => ({
       ...relationship,
       description: relationship.description ?? '',
