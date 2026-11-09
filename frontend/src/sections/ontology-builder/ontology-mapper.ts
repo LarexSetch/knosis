@@ -97,6 +97,7 @@ export function mapGraphToOntology(
       name: node.data.name,
       color: node.data.color,
       description: node.data.description,
+      position: { ...node.position },
       properties: node.data.properties.map(mapPropertyToDocument),
     })),
     relationships,
@@ -183,7 +184,7 @@ export function mapOntologyToGraph(ontology: OntologyDocument): {
       type: 'ontology',
       draggable: true,
       deletable: false,
-      position: getNodePosition(index),
+      position: node.position ?? getNodePosition(index),
       data: {
         color: node.color || DEFAULT_NODE_COLOR,
         name: node.name,

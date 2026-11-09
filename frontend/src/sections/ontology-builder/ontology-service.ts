@@ -118,6 +118,23 @@ function validateNode(
   valid = validateStringField(record, 'name', path, errors) && valid;
   valid = validateStringField(record, 'color', path, errors) && valid;
   valid = validateOptionalStringField(record, 'description', path, errors) && valid;
+  if (record.position !== undefined) {
+    if (!isRecord(record.position)) {
+      errors.push(
+        `${path}.position: ожидался объект координат, получено ${summarizeValue(record.position)}.`,
+      );
+      valid = false;
+    } else {
+      for (const axis of ['x', 'y'] as const) {
+        if (typeof record.position[axis] !== 'number' || !Number.isFinite(record.position[axis])) {
+          errors.push(
+            `${path}.position.${axis}: ожидалось конечное число, получено ${summarizeValue(record.position[axis])}.`,
+          );
+          valid = false;
+        }
+      }
+    }
+  }
 
   if (!Array.isArray(record.properties)) {
     errors.push(

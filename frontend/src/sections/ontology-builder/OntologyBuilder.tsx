@@ -83,21 +83,78 @@ const initialNodes: OntologyFlowNode[] = [
   },
 ];
 
-function OntologyWorkspace() {
-  const { setSidebarActions } = useOutletContext<AppLayoutContext>();
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>([]);
-  const [metadata, setMetadata] = useState<OntologyMetadata>(() => ({
+function createDefaultMetadata(): OntologyMetadata {
+  return {
     name: 'Онтология',
     version: '1.0.0',
     generatedAt: new Date().toISOString(),
-  }));
-  const [fileStatus, setFileStatus] = useState('');
+  };
+}
+
+function createInitialWorkspaceState() {
+  try {
+    const ontology = loadOntology();
+    if (ontology) {
+      return {
+        ...mapOntologyToGraph(ontology),
+        metadata: ontology.metadata,
+        fileStatus: '',
+      };
+    }
+  } catch (error) {
+    return {
+      nodes: initialNodes,
+      edges: [] as OntologyRelationship[],
+      metadata: createDefaultMetadata(),
+      fileStatus: error instanceof Error
+        ? `Не удалось загрузить сохранённую онтологию: ${error.message}`
+        : 'Не удалось загрузить сохранённую онтологию.',
+    };
+  }
+
+  return {
+    nodes: initialNodes,
+    edges: [] as OntologyRelationship[],
+    metadata: createDefaultMetadata(),
+    fileStatus: '',
+  };
+}
+
+function OntologyWorkspace() {
+  const { setSidebarActions } = useOutletContext<AppLayoutContext>();
+  const [initialState] = useState(createInitialWorkspaceState);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialState.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>(
+    initialState.edges,
+  );
+  const [metadata, setMetadata] = useState(initialState.metadata);
+  const [fileStatus, setFileStatus] = useState(initialState.fileStatus);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const fileStatusTimeoutRef = useRef<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+
+  const showFileStatus = useCallback((status: string) => {
+    if (fileStatusTimeoutRef.current !== null) {
+      window.clearTimeout(fileStatusTimeoutRef.current);
+    }
+    setFileStatus(status);
+    fileStatusTimeoutRef.current = window.setTimeout(() => {
+      setFileStatus('');
+      fileStatusTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (fileStatusTimeoutRef.current !== null) {
+        window.clearTimeout(fileStatusTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const createOntologyDocument = () => {
     const updatedMetadata = {
@@ -112,9 +169,9 @@ function OntologyWorkspace() {
   const handleSave = () => {
     try {
       saveOntology(createOntologyDocument());
-      setFileStatus('Онтология сохранена в браузере.');
+      showFileStatus('Онтология сохранена в браузере.');
     } catch (error) {
-      setFileStatus(
+      showFileStatus(
         error instanceof Error ? error.message : 'Не удалось сохранить онтологию.',
       );
     }
@@ -124,7 +181,7 @@ function OntologyWorkspace() {
     try {
       const ontology = loadOntology();
       if (!ontology) {
-        setFileStatus('Сохранённая онтология не найдена.');
+        showFileStatus('Сохранённая онтология не найдена.');
         return;
       }
       const graph = mapOntologyToGraph(ontology);
@@ -133,9 +190,9 @@ function OntologyWorkspace() {
       setMetadata(ontology.metadata);
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
-      setFileStatus('Онтология загружена.');
+      showFileStatus('Онтология загружена.');
     } catch (error) {
-      setFileStatus(
+      showFileStatus(
         error instanceof Error ? error.message : 'Не удалось загрузить онтологию.',
       );
     }
@@ -144,9 +201,9 @@ function OntologyWorkspace() {
   const handleExport = () => {
     try {
       exportOntology(createOntologyDocument());
-      setFileStatus('Файл онтологии экспортирован.');
+      showFileStatus('Файл онтологии экспортирован.');
     } catch (error) {
-      setFileStatus(
+      showFileStatus(
         error instanceof Error ? error.message : 'Не удалось экспортировать онтологию.',
       );
     }
@@ -161,9 +218,9 @@ function OntologyWorkspace() {
       setMetadata(ontology.metadata);
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
-      setFileStatus('Онтология импортирована.');
+      showFileStatus('Онтология импортирована.');
     } catch (error) {
-      setFileStatus(
+      showFileStatus(
         error instanceof Error ? error.message : 'Не удалось импортировать онтологию.',
       );
     } finally {
