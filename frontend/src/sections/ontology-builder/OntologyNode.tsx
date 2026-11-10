@@ -1,32 +1,32 @@
-import { Network, Unlink } from 'lucide-react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
-  OntologyNodeIcon,
-  type OntologyNodeData,
-} from './ontology-types';
+  OntologyNodeStatus,
+} from '../../../../backend/src/ontology/ontology.types';
+import type { OntologyFlowNodeData } from './ontology-flow.types';
 
-const iconComponents = {
-  [OntologyNodeIcon.ASSOCIATIONS]: { label: 'Связи', Icon: Network },
-  [OntologyNodeIcon.DETACHED]: { label: 'Изолированная', Icon: Unlink },
-} satisfies Record<OntologyNodeIcon, { label: string; Icon: typeof Network }>;
+const statusLabels = {
+  [OntologyNodeStatus.ASSOCIATED]: 'Ассоциированная',
+  [OntologyNodeStatus.RELATED]: 'Связанная',
+  [OntologyNodeStatus.DETACHED]: 'Изолированная',
+} satisfies Record<OntologyNodeStatus, string>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
 function isOntologyNodeData(
-  data: Record<string, unknown>,
-): data is OntologyNodeData {
+  data: unknown,
+): data is OntologyFlowNodeData {
+  if (!isRecord(data)) {
+    return false;
+  }
   return (
     typeof data.color === 'string' &&
     typeof data.name === 'string' &&
     typeof data.description === 'string' &&
-    Array.isArray(data.icons) &&
-    data.icons.every(
-      (icon) =>
-        icon === OntologyNodeIcon.ASSOCIATIONS ||
-        icon === OntologyNodeIcon.DETACHED,
-    ) &&
+    (data.status === OntologyNodeStatus.ASSOCIATED ||
+      data.status === OntologyNodeStatus.RELATED ||
+      data.status === OntologyNodeStatus.DETACHED) &&
     Array.isArray(data.properties) &&
     data.properties.every(
       (property) =>
@@ -34,7 +34,15 @@ function isOntologyNodeData(
         typeof property.name === 'string' &&
         typeof property.type === 'string',
     ) &&
-    Array.isArray(data.associations)
+    Array.isArray(data.associations) &&
+    data.associations.every(
+      (association) =>
+        isRecord(association) &&
+        typeof association.relation === 'string' &&
+        typeof association.description === 'string' &&
+        Array.isArray(association.nodeIds) &&
+        typeof association.nodesAll === 'boolean',
+    )
   );
 }
 
@@ -53,16 +61,9 @@ export function OntologyNode({ data }: NodeProps) {
           aria-label={`Цвет ноды: ${data.color}`}
         />
         <span className="ontology-node__name">{data.name}</span>
-        <div className="ontology-node__icons" aria-label="Содержимое ноды">
-          {data.icons.map((icon) => {
-            const { label, Icon } = iconComponents[icon];
-            return (
-              <span className="ontology-node__icon" key={icon} title={label}>
-                <Icon size={14} aria-label={label} />
-              </span>
-            );
-          })}
-        </div>
+        <span className="ontology-node__status">
+          {statusLabels[data.status]}
+        </span>
       </div>
       {data.properties.length > 0 && (
         <ul className="ontology-node__properties">

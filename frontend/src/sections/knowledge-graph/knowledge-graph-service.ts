@@ -1,4 +1,4 @@
-import type { OntologyDocument } from '../ontology-builder/ontology-document.types';
+import type { OntologyDocument } from '../../../../backend/src/ontology/ontology.types';
 
 const STORAGE_KEY = 'knosis.knowledge-graph.data';
 

@@ -2,18 +2,20 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
+import {
+  OntologyNodeStatus,
+  type OntologyAssociation,
+} from '../../../../backend/src/ontology/ontology.types';
 import type {
-  OntologyAssociation,
   OntologyFlowNode,
-  OntologyNodeData,
-} from './ontology-types';
-import { OntologyNodeIcon } from './ontology-types';
+  OntologyFlowNodeData,
+} from './ontology-flow.types';
 
 interface OntologyNodeEditorProps {
   node: OntologyFlowNode;
   availableNodes: OntologyFlowNode[];
   onDelete: () => void;
-  onChange: (data: OntologyNodeData) => void;
+  onChange: (data: OntologyFlowNodeData) => void;
 }
 
 export function OntologyNodeEditor({
@@ -22,18 +24,20 @@ export function OntologyNodeEditor({
   onDelete,
   onChange,
 }: OntologyNodeEditorProps) {
-  const updateNode = (updates: Partial<OntologyNodeData>) => {
-    const icons = updates.associations
+  const updateNode = (updates: Partial<OntologyFlowNodeData>) => {
+    const status = updates.associations
       ? updates.associations.length > 0
-        ? [OntologyNodeIcon.ASSOCIATIONS]
-        : [OntologyNodeIcon.DETACHED]
-      : node.data.icons;
-    onChange({ ...node.data, ...updates, icons });
+        ? OntologyNodeStatus.ASSOCIATED
+        : node.data.status === OntologyNodeStatus.RELATED
+          ? OntologyNodeStatus.RELATED
+          : OntologyNodeStatus.DETACHED
+      : node.data.status;
+    onChange({ ...node.data, ...updates, status });
   };
 
   const updateProperty = (
     index: number,
-    updates: Partial<OntologyNodeData['properties'][number]>,
+    updates: Partial<OntologyFlowNodeData['properties'][number]>,
   ) => {
     updateNode({
       properties: node.data.properties.map((property, propertyIndex) =>
@@ -207,7 +211,7 @@ export function OntologyNodeEditor({
             updateNode({
               associations: [
                 ...node.data.associations,
-                { relation: '', description: '', targets: [], targetsAll: false },
+                { relation: '', description: '', nodeIds: [], nodesAll: false },
               ],
             })
           }
@@ -260,9 +264,9 @@ export function OntologyNodeEditor({
             <label className="ontology-editor__targets-all">
               <input
                 type="checkbox"
-                checked={association.targetsAll}
+                checked={association.nodesAll}
                 onChange={(event) =>
-                  updateAssociation(index, { targetsAll: event.target.checked })
+                  updateAssociation(index, { nodesAll: event.target.checked })
                 }
               />
               Связать со всеми нодами
@@ -271,7 +275,7 @@ export function OntologyNodeEditor({
               {availableNodes.map((target) => {
                 const isSelf = target.id === node.id;
                 const isChecked =
-                  association.targetsAll || association.targets.includes(target.id);
+                  association.nodesAll || association.nodeIds.includes(target.id);
 
                 return (
                   <label
@@ -281,15 +285,15 @@ export function OntologyNodeEditor({
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      disabled={association.targetsAll}
+                      disabled={association.nodesAll}
                       onChange={(event) => {
-                        const targets = new Set(association.targets);
+                        const nodeIds = new Set(association.nodeIds);
                         if (event.target.checked) {
-                          targets.add(target.id);
+                          nodeIds.add(target.id);
                         } else {
-                          targets.delete(target.id);
+                          nodeIds.delete(target.id);
                         }
-                        updateAssociation(index, { targets: [...targets] });
+                        updateAssociation(index, { nodeIds: [...nodeIds] });
                       }}
                     />
                     <span>{target.data.name || 'Без названия'}</span>

@@ -25,14 +25,15 @@ import { OntologyNode } from '../ontology-builder/OntologyNode';
 import { loadOntology } from '../ontology-builder/ontology-service';
 import { mapOntologyToGraph } from '../ontology-builder/ontology-mapper';
 import type {
+  OntologyAssociation,
   OntologyDocument,
-  OntologyDocumentNode,
-  OntologyDocumentRelationship,
-} from '../ontology-builder/ontology-document.types';
+  OntologyNode as OntologySchemaNode,
+  OntologyRelationship,
+} from '../../../../backend/src/ontology/ontology.types';
 import type {
   OntologyFlowNode,
-  OntologyRelationship,
-} from '../ontology-builder/ontology-types';
+  OntologyFlowRelationship,
+} from '../ontology-builder/ontology-flow.types';
 import { KnowledgeGraphDataNode } from './KnowledgeGraphDataNode';
 import {
   loadKnowledgeGraph,
@@ -51,7 +52,9 @@ const nodeTypes: NodeTypes = {
 
 type KnowledgeGraphFlowEdge = Edge<{ relationName: string }>;
 type KnowledgeGraphFlowElement = OntologyFlowNode | KnowledgeGraphFlowNode;
-type KnowledgeGraphFlowConnection = OntologyRelationship | KnowledgeGraphFlowEdge;
+type KnowledgeGraphFlowConnection =
+  | OntologyFlowRelationship
+  | KnowledgeGraphFlowEdge;
 
 const IMPORT_INPUT_ID = 'knowledge-graph-import';
 
@@ -106,7 +109,7 @@ function mapDataToGraph(
       data: {
         ontologyNodeName: record.ontologyNodeName,
         title,
-        color: ontologyNode.color,
+        color: ontologyNode.meta.color,
         properties: propertyEntries.map(([name, value]) => ({
           name,
           value,
@@ -170,27 +173,27 @@ interface KnowledgeGraphState {
 
 function createAssociationEdges(
   ontology: OntologyDocument,
-): OntologyRelationship[] {
-  return ontology.relationships
-    .filter((relationship) => relationship.type === 'association')
-    .map((relationship) => ({
-      id: relationship.id,
-      source: relationship.sourceNodeId,
-      target: relationship.targetNodeId,
-      label: relationship.relationName,
-      data: {
-        relation: relationship.relationName,
-        description: relationship.description,
-        properties: relationship.properties.map((property) => ({
-          name: property.name,
-          type: property.type,
-          required: property.required,
-          description: property.description,
-        })),
-      },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
-      style: { stroke: '#8b5cf6', strokeDasharray: '5 4' },
-    }));
+): OntologyFlowRelationship[] {
+  return ontology.nodes.flatMap((node) =>
+    node.associations.flatMap((association, associationIndex) => {
+      const targetIds = association.nodesAll
+        ? ontology.nodes.map((targetNode) => targetNode.id)
+        : association.nodeIds;
+      return targetIds.map((targetNodeId) => ({
+        id: `${node.id}:association:${associationIndex}:${targetNodeId}`,
+        source: node.id,
+        target: targetNodeId,
+        label: association.relation,
+        data: {
+          relation: association.relation,
+          description: association.description,
+          properties: [],
+        },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
+        style: { stroke: '#8b5cf6', strokeDasharray: '5 4' },
+      }));
+    }),
+  );
 }
 
 function readKnowledgeGraph(): KnowledgeGraphState {
@@ -289,6 +292,22 @@ function KnowledgeGraphWorkspace() {
     (relationship) =>
       relationship.sourceNodeId === selectedNodeId ||
       relationship.targetNodeId === selectedNodeId,
+  ) ?? [];
+  const selectedAssociations = ontology?.nodes.flatMap((sourceNode) =>
+    sourceNode.associations.flatMap((association, associationIndex) => {
+      const targetNodeIds = association.nodesAll
+        ? ontology.nodes.map((node) => node.id)
+        : association.nodeIds;
+      return targetNodeIds.some((nodeId) => nodeId === selectedNodeId) ||
+        sourceNode.id === selectedNodeId
+        ? [{
+            id: `${sourceNode.id}:association:${associationIndex}`,
+            sourceNodeId: sourceNode.id,
+            association,
+            targetNodeIds,
+          }]
+        : [];
+    }),
   ) ?? [];
   const nodeNames = new Map(ontology?.nodes.map((node) => [node.id, node.name]));
   const graphNodeCounts = useMemo(() => {
@@ -511,6 +530,7 @@ function KnowledgeGraphWorkspace() {
             <NodeDetails
               node={selectedSchemaNode}
               relationships={selectedRelationships}
+              associations={selectedAssociations}
               nodeNames={nodeNames}
             />
           ) : null}
@@ -604,7 +624,7 @@ function KnowledgeGraphSidebar({
               >
                 <span
                   className="knowledge-graph-node-list__color"
-                  style={{ backgroundColor: node.color }}
+                  style={{ backgroundColor: node.meta.color }}
                 />
                 <span className="knowledge-graph-node-list__copy">
                   <span className="knowledge-graph-node-list__name">
@@ -637,7 +657,7 @@ function DataNodeDetails({
   nodes,
 }: {
   node: KnowledgeGraphRecord;
-  schemaNode: OntologyDocumentNode;
+  schemaNode: OntologySchemaNode;
   relations: KnowledgeGraphDocument['relations'];
   nodes: KnowledgeGraphRecord[];
 }) {
@@ -673,7 +693,7 @@ function DataNodeDetails({
       <div className="knowledge-graph-details__title">
         <span
           className="knowledge-graph-node-list__color"
-          style={{ backgroundColor: schemaNode.color }}
+          style={{ backgroundColor: schemaNode.meta.color }}
         />
         <h2>
           {typeof node.name === 'string' && node.name
@@ -744,10 +764,17 @@ function DataNodeDetails({
 function NodeDetails({
   node,
   relationships,
+  associations,
   nodeNames,
 }: {
-  node: OntologyDocumentNode;
-  relationships: OntologyDocumentRelationship[];
+  node: OntologySchemaNode;
+  relationships: OntologyRelationship[];
+  associations: {
+    id: string;
+    sourceNodeId: string;
+    association: OntologyAssociation;
+    targetNodeIds: string[];
+  }[];
   nodeNames: Map<string, string>;
 }) {
   return (
@@ -755,7 +782,7 @@ function NodeDetails({
       <div className="knowledge-graph-details__title">
         <span
           className="knowledge-graph-node-list__color"
-          style={{ backgroundColor: node.color }}
+          style={{ backgroundColor: node.meta.color }}
         />
         <h2>{node.name || 'Без названия'}</h2>
       </div>
@@ -786,9 +813,29 @@ function NodeDetails({
       </section>
 
       <section className="knowledge-graph-details__section">
-        <h3>Связи <span>{relationships.length}</span></h3>
-        {relationships.length ? (
+        <h3>Связи <span>{relationships.length + associations.length}</span></h3>
+        {relationships.length || associations.length ? (
           <ul className="knowledge-graph-details__relationships">
+            {associations.map(({ id, sourceNodeId, association, targetNodeIds }) => {
+              const isOutgoing = sourceNodeId === node.id;
+              const otherNodeIds = targetNodeIds.filter((targetNodeId) =>
+                isOutgoing ? true : targetNodeId === node.id,
+              );
+              return (
+                <li key={id}>
+                  <div className="knowledge-graph-details__relationship-heading">
+                    <span>{isOutgoing ? 'Ассоциирует' : 'Ассоциирован с'}</span>
+                    <strong>{association.relation || 'Без названия'}</strong>
+                  </div>
+                  <p>
+                    {otherNodeIds
+                      .map((nodeId) => nodeNames.get(nodeId) || 'Без названия')
+                      .join(', ')}
+                  </p>
+                  {association.description && <p>{association.description}</p>}
+                </li>
+              );
+            })}
             {relationships.map((relationship) => {
               const isOutgoing = relationship.sourceNodeId === node.id;
               const otherNodeId = isOutgoing
@@ -798,7 +845,7 @@ function NodeDetails({
                 <li key={relationship.id}>
                   <div className="knowledge-graph-details__relationship-heading">
                     <span>{isOutgoing ? 'Отправляет' : 'Получает'}</span>
-                    <strong>{relationship.relationName || 'Без названия'}</strong>
+                    <strong>{relationship.relation || 'Без названия'}</strong>
                   </div>
                   <p>{nodeNames.get(otherNodeId) || 'Без названия'}</p>
                   {relationship.description && <p>{relationship.description}</p>}

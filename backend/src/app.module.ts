@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { OntologyModule } from './ontology/ontology.module';
 
-@Module({})
+@Module({
+  imports: [OntologyModule],
+})
 export class AppModule {}

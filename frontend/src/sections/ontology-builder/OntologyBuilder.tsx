@@ -9,7 +9,7 @@ import {
   type Connection,
 } from '@xyflow/react';
 import { Download, FolderOpen, Plus, Save, Upload } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Route, Routes, useOutletContext } from 'react-router-dom';
 import '@xyflow/react/dist/style.css';
 import type { AppLayoutContext, SidebarAction } from '../../components/AppLayout';
@@ -27,12 +27,14 @@ import {
   loadOntology,
   saveOntology,
 } from './ontology-service';
-import type { OntologyMetadata } from './ontology-document.types';
 import {
-  OntologyNodeIcon,
-  type OntologyFlowNode,
-  type OntologyRelationship,
-} from './ontology-types';
+  OntologyNodeStatus,
+  type OntologyMetadata,
+} from '../../../../backend/src/ontology/ontology.types';
+import type {
+  OntologyFlowNode,
+  OntologyFlowRelationship,
+} from './ontology-flow.types';
 
 const nodeTypes = { ontology: OntologyNode };
 
@@ -47,7 +49,7 @@ const initialNodes: OntologyFlowNode[] = [
       color: '#a1a1aa',
       name: 'Документация',
       description: 'Документ, содержащий исходную информацию для построения онтологии.',
-      icons: [OntologyNodeIcon.ASSOCIATIONS],
+      status: OntologyNodeStatus.ASSOCIATED,
       properties: [
         { name: 'Название', type: 'string', description: 'Название документа.' },
         { name: 'Страниц', type: 'number', description: 'Количество страниц.' },
@@ -56,8 +58,8 @@ const initialNodes: OntologyFlowNode[] = [
         {
           relation: 'DEFINES',
           description: 'Документация определяет структуру онтологии.',
-          targets: ['ontology'],
-          targetsAll: false,
+          nodeIds: ['ontology'],
+          nodesAll: false,
         },
       ],
     },
@@ -72,7 +74,7 @@ const initialNodes: OntologyFlowNode[] = [
       color: '#789a83',
       name: 'Онтология',
       description: 'Формальная модель понятий предметной области и связей между ними.',
-      icons: [OntologyNodeIcon.DETACHED],
+      status: OntologyNodeStatus.DETACHED,
       properties: [
         { name: 'Название', type: 'string', description: 'Название онтологии.' },
         { name: 'Синонимы', type: 'string', description: 'Альтернативные названия.' },
@@ -104,7 +106,7 @@ function createInitialWorkspaceState() {
   } catch (error) {
     return {
       nodes: initialNodes,
-      edges: [] as OntologyRelationship[],
+      edges: [] as OntologyFlowRelationship[],
       metadata: createDefaultMetadata(),
       fileStatus: error instanceof Error
         ? `Не удалось загрузить сохранённую онтологию: ${error.message}`
@@ -114,7 +116,7 @@ function createInitialWorkspaceState() {
 
   return {
     nodes: initialNodes,
-    edges: [] as OntologyRelationship[],
+    edges: [] as OntologyFlowRelationship[],
     metadata: createDefaultMetadata(),
     fileStatus: '',
   };
@@ -124,7 +126,7 @@ function OntologyWorkspace() {
   const { setSidebarActions } = useOutletContext<AppLayoutContext>();
   const [initialState] = useState(createInitialWorkspaceState);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialState.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationship>(
+  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyFlowRelationship>(
     initialState.edges,
   );
   const [metadata, setMetadata] = useState(initialState.metadata);
@@ -133,7 +135,36 @@ function OntologyWorkspace() {
   const fileStatusTimeoutRef = useRef<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+  const nodesWithStatus = useMemo(() => {
+    const associatedNodeIds = new Set<string>();
+    for (const node of nodes) {
+      for (const association of node.data.associations) {
+        const targetIds = association.nodesAll
+          ? nodes.map((targetNode) => targetNode.id)
+          : association.nodeIds;
+        if (targetIds.length > 0) {
+          associatedNodeIds.add(node.id);
+          targetIds.forEach((targetId) => associatedNodeIds.add(targetId));
+        }
+      }
+    }
+
+    const relatedNodeIds = new Set(
+      edges.flatMap((edge) => [edge.source, edge.target]),
+    );
+    return nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        status: associatedNodeIds.has(node.id)
+          ? OntologyNodeStatus.ASSOCIATED
+          : relatedNodeIds.has(node.id)
+            ? OntologyNodeStatus.RELATED
+            : OntologyNodeStatus.DETACHED,
+      },
+    }));
+  }, [edges, nodes]);
+  const selectedNode = nodesWithStatus.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
 
   const showFileStatus = useCallback((status: string) => {
@@ -262,7 +293,7 @@ function OntologyWorkspace() {
         color: '#789a83',
         name: '',
         description: '',
-        icons: [OntologyNodeIcon.DETACHED],
+        status: OntologyNodeStatus.DETACHED,
         properties: [],
         associations: [],
       },
@@ -281,7 +312,7 @@ function OntologyWorkspace() {
             ...node.data,
             associations: node.data.associations.map((association) => ({
               ...association,
-              targets: association.targets.filter((target) => target !== nodeId),
+              nodeIds: association.nodeIds.filter((target) => target !== nodeId),
             })),
           },
         })),
@@ -345,7 +376,7 @@ function OntologyWorkspace() {
         <div className="ontology-workspace">
           <div className="ontology-flow" aria-label="Граф онтологии">
             <ReactFlow
-              nodes={nodes}
+              nodes={nodesWithStatus}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}

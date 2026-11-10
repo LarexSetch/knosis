@@ -366,16 +366,14 @@
   white-space: nowrap;
 }
 
-.ontology-node__icons {
-  display: flex;
+.ontology-node__status {
   flex: none;
-  align-items: center;
-  gap: 5px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--muted-foreground);
-}
-
-.ontology-node__icon {
-  display: inline-flex;
+  font-size: 9px;
+  line-height: 1.4;
 }
 
 .ontology-node__properties {

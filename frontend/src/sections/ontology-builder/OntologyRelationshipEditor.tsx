@@ -2,17 +2,17 @@ import { ArrowLeftRight, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
+import type { OntologyProperty } from '../../../../backend/src/ontology/ontology.types';
 import type {
   OntologyFlowNode,
-  OntologyProperty,
-  OntologyRelationship,
-  OntologyRelationshipData,
-} from './ontology-types';
+  OntologyFlowRelationship,
+  OntologyFlowRelationshipData,
+} from './ontology-flow.types';
 
 interface OntologyRelationshipEditorProps {
-  edge: OntologyRelationship;
+  edge: OntologyFlowRelationship;
   nodes: OntologyFlowNode[];
-  onChange: (data: OntologyRelationshipData) => void;
+  onChange: (data: OntologyFlowRelationshipData) => void;
   onSwap: () => void;
 }
 

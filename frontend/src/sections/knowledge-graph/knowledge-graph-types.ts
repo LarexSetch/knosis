@@ -1,5 +1,5 @@
 import type { Node } from '@xyflow/react';
-import type { OntologyPropertyType } from '../ontology-builder/ontology-types';
+import type { OntologyPropertyType } from '../../../../backend/src/ontology/ontology.types';
 
 export interface KnowledgeGraphDataProperty {
   name: string;
