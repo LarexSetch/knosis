@@ -3,19 +3,18 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import {
-  OntologyNodeStatus,
   type OntologyAssociation,
+  type OntologyNode,
 } from '../../../../backend/src/ontology/ontology.types';
 import type {
-  OntologyFlowNode,
-  OntologyFlowNodeData,
+  OntologyNodeWrapper,
 } from './ontology-flow.types';
 
 interface OntologyNodeEditorProps {
-  node: OntologyFlowNode;
-  availableNodes: OntologyFlowNode[];
+  node: OntologyNodeWrapper;
+  availableNodes: OntologyNodeWrapper[];
   onDelete: () => void;
-  onChange: (data: OntologyFlowNodeData) => void;
+  onChange: (ontologyNode: OntologyNode) => void;
 }
 
 export function OntologyNodeEditor({
@@ -24,23 +23,17 @@ export function OntologyNodeEditor({
   onDelete,
   onChange,
 }: OntologyNodeEditorProps) {
-  const updateNode = (updates: Partial<OntologyFlowNodeData>) => {
-    const status = updates.associations
-      ? updates.associations.length > 0
-        ? OntologyNodeStatus.ASSOCIATED
-        : node.data.status === OntologyNodeStatus.RELATED
-          ? OntologyNodeStatus.RELATED
-          : OntologyNodeStatus.DETACHED
-      : node.data.status;
-    onChange({ ...node.data, ...updates, status });
+  const ontologyNode = node.data.ontologyNode;
+  const updateNode = (updates: Partial<OntologyNode>) => {
+    onChange({ ...ontologyNode, ...updates });
   };
 
   const updateProperty = (
     index: number,
-    updates: Partial<OntologyFlowNodeData['properties'][number]>,
+    updates: Partial<OntologyNode['properties'][number]>,
   ) => {
     updateNode({
-      properties: node.data.properties.map((property, propertyIndex) =>
+      properties: ontologyNode.properties.map((property, propertyIndex) =>
         propertyIndex === index ? { ...property, ...updates } : property,
       ),
     });
@@ -51,7 +44,7 @@ export function OntologyNodeEditor({
     updates: Partial<OntologyAssociation>,
   ) => {
     updateNode({
-      associations: node.data.associations.map((association, associationIndex) =>
+      associations: ontologyNode.associations.map((association, associationIndex) =>
         associationIndex === index
           ? { ...association, ...updates }
           : association,
@@ -78,7 +71,7 @@ export function OntologyNodeEditor({
           <Input
             className="ontology-editor__control"
             aria-label="Название ноды"
-            value={node.data.name}
+            value={ontologyNode.name}
             onChange={(event) => updateNode({ name: event.target.value })}
             placeholder="Название ноды"
           />
@@ -86,8 +79,12 @@ export function OntologyNodeEditor({
             aria-label="Цвет ноды"
             className="ontology-editor__color"
             type="color"
-            value={node.data.color}
-            onChange={(event) => updateNode({ color: event.target.value })}
+            value={ontologyNode.meta.color}
+            onChange={(event) =>
+              updateNode({
+                meta: { ...ontologyNode.meta, color: event.target.value },
+              })
+            }
           />
         </div>
       </div>
@@ -96,7 +93,7 @@ export function OntologyNodeEditor({
         <Textarea
           className="ontology-editor__control"
           aria-label="Описание ноды"
-          value={node.data.description}
+          value={ontologyNode.description}
           onChange={(event) => updateNode({ description: event.target.value })}
           placeholder="Описание для LLM-промпта"
           rows={4}
@@ -112,7 +109,7 @@ export function OntologyNodeEditor({
           onClick={() =>
             updateNode({
               properties: [
-                ...node.data.properties,
+                ...ontologyNode.properties,
                 { name: '', type: 'string', required: false, description: '' },
               ],
             })
@@ -124,7 +121,7 @@ export function OntologyNodeEditor({
       </div>
 
       <div className="ontology-editor__properties">
-        {node.data.properties.map((property, index) => (
+        {ontologyNode.properties.map((property, index) => (
           <section className="ontology-editor__property" key={index}>
             <div className="ontology-editor__property-row">
               <Input
@@ -173,7 +170,7 @@ export function OntologyNodeEditor({
                 aria-label={`Удалить свойство ${property.name || index + 1}`}
                 onClick={() =>
                   updateNode({
-                    properties: node.data.properties.filter(
+                    properties: ontologyNode.properties.filter(
                       (_, propertyIndex) => propertyIndex !== index,
                     ),
                   })
@@ -196,7 +193,7 @@ export function OntologyNodeEditor({
             </div>
           </section>
         ))}
-        {node.data.properties.length === 0 && (
+        {ontologyNode.properties.length === 0 && (
           <p className="ontology-editor__empty">Свойств пока нет.</p>
         )}
       </div>
@@ -210,7 +207,7 @@ export function OntologyNodeEditor({
           onClick={() =>
             updateNode({
               associations: [
-                ...node.data.associations,
+                ...ontologyNode.associations,
                 { relation: '', description: '', nodeIds: [], nodesAll: false },
               ],
             })
@@ -222,7 +219,7 @@ export function OntologyNodeEditor({
       </div>
 
       <div className="ontology-editor__properties">
-        {node.data.associations.map((association, index) => (
+        {ontologyNode.associations.map((association, index) => (
           <section className="ontology-editor__property" key={index}>
             <div className="ontology-editor__property-row">
               <Input
@@ -242,7 +239,7 @@ export function OntologyNodeEditor({
                 aria-label={`Удалить ассоциацию ${association.relation || index + 1}`}
                 onClick={() =>
                   updateNode({
-                    associations: node.data.associations.filter(
+                    associations: ontologyNode.associations.filter(
                       (_, associationIndex) => associationIndex !== index,
                     ),
                   })
@@ -296,7 +293,7 @@ export function OntologyNodeEditor({
                         updateAssociation(index, { nodeIds: [...nodeIds] });
                       }}
                     />
-                    <span>{target.data.name || 'Без названия'}</span>
+                    <span>{target.data.ontologyNode.name || 'Без названия'}</span>
                     {isSelf && <small>self</small>}
                   </label>
                 );
@@ -304,7 +301,7 @@ export function OntologyNodeEditor({
             </div>
           </section>
         ))}
-        {node.data.associations.length === 0 && (
+        {ontologyNode.associations.length === 0 && (
           <p className="ontology-editor__empty">Ассоциаций пока нет.</p>
         )}
       </div>

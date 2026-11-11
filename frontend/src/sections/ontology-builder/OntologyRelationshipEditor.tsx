@@ -2,17 +2,19 @@ import { ArrowLeftRight, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
-import type { OntologyProperty } from '../../../../backend/src/ontology/ontology.types';
 import type {
-  OntologyFlowNode,
-  OntologyFlowRelationship,
-  OntologyFlowRelationshipData,
+  OntologyProperty,
+  OntologyRelationship,
+} from '../../../../backend/src/ontology/ontology.types';
+import type {
+  OntologyNodeWrapper,
+  OntologyRelationshipWrapper,
 } from './ontology-flow.types';
 
 interface OntologyRelationshipEditorProps {
-  edge: OntologyFlowRelationship;
-  nodes: OntologyFlowNode[];
-  onChange: (data: OntologyFlowRelationshipData) => void;
+  edge: OntologyRelationshipWrapper;
+  nodes: OntologyNodeWrapper[];
+  onChange: (relationship: OntologyRelationship) => void;
   onSwap: () => void;
 }
 
@@ -22,24 +24,21 @@ export function OntologyRelationshipEditor({
   onChange,
   onSwap,
 }: OntologyRelationshipEditorProps) {
-  const data = edge.data;
-  if (!data) {
-    return null;
-  }
+  const relationship = edge.data.ontologyRelationship;
 
   const updateProperty = (index: number, updates: Partial<OntologyProperty>) => {
     onChange({
-      ...data,
-      properties: data.properties.map((property, propertyIndex) =>
+      ...relationship,
+      properties: relationship.properties.map((property, propertyIndex) =>
         propertyIndex === index ? { ...property, ...updates } : property,
       ),
     });
   };
 
   const sourceName =
-    nodes.find((node) => node.id === edge.source)?.data.name || 'Без названия';
+    nodes.find((node) => node.id === edge.source)?.data.ontologyNode.name || 'Без названия';
   const targetName =
-    nodes.find((node) => node.id === edge.target)?.data.name || 'Без названия';
+    nodes.find((node) => node.id === edge.target)?.data.ontologyNode.name || 'Без названия';
 
   return (
     <aside className="ontology-editor" aria-label="Редактирование связи">
@@ -53,11 +52,11 @@ export function OntologyRelationshipEditor({
         <Input
           className="ontology-editor__control ontology-relationship__relation"
           aria-label="Relation"
-          value={data.relation}
+          value={relationship.relation}
           placeholder="Relation"
           onChange={(event) => {
             const relation = event.target.value;
-            onChange({ ...data, relation });
+            onChange({ ...relationship, relation });
           }}
         />
         <ArrowRight className="ontology-relationship__arrow" size={16} />
@@ -81,11 +80,11 @@ export function OntologyRelationshipEditor({
       <Textarea
         className="ontology-editor__control"
         aria-label="Описание связи"
-        value={data.description}
+        value={relationship.description}
         placeholder="Описание для LLM-промпта"
         rows={4}
         onChange={(event) =>
-          onChange({ ...data, description: event.target.value })
+          onChange({ ...relationship, description: event.target.value })
         }
       />
 
@@ -97,9 +96,9 @@ export function OntologyRelationshipEditor({
           type="button"
           onClick={() =>
             onChange({
-              ...data,
+              ...relationship,
               properties: [
-                ...data.properties,
+                ...relationship.properties,
                 { name: '', type: 'string', required: false, description: '' },
               ],
             })
@@ -111,7 +110,7 @@ export function OntologyRelationshipEditor({
       </div>
 
       <div className="ontology-editor__properties">
-        {data.properties.map((property, index) => (
+        {relationship.properties.map((property, index) => (
           <section className="ontology-editor__property" key={index}>
             <div className="ontology-editor__property-row">
               <Input
@@ -160,8 +159,8 @@ export function OntologyRelationshipEditor({
                 aria-label={`Удалить свойство ${property.name || index + 1}`}
                 onClick={() =>
                   onChange({
-                    ...data,
-                    properties: data.properties.filter(
+                    ...relationship,
+                    properties: relationship.properties.filter(
                       (_, propertyIndex) => propertyIndex !== index,
                     ),
                   })
@@ -182,7 +181,7 @@ export function OntologyRelationshipEditor({
             />
           </section>
         ))}
-        {data.properties.length === 0 && (
+        {relationship.properties.length === 0 && (
           <p className="ontology-editor__empty">Свойств пока нет.</p>
         )}
       </div>

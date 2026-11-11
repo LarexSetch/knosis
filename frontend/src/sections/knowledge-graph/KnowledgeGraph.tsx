@@ -22,7 +22,7 @@ import '@xyflow/react/dist/style.css';
 import type { AppLayoutContext } from '../../components/AppLayout';
 import { Button } from '../../components/ui/button';
 import { OntologyNode } from '../ontology-builder/OntologyNode';
-import { loadOntology } from '../ontology-builder/ontology-service';
+import { ontologyService } from '../ontology-builder/ontology-service';
 import { mapOntologyToGraph } from '../ontology-builder/ontology-mapper';
 import type {
   OntologyAssociation,
@@ -31,8 +31,8 @@ import type {
   OntologyRelationship,
 } from '../../../../backend/src/ontology/ontology.types';
 import type {
-  OntologyFlowNode,
-  OntologyFlowRelationship,
+  OntologyNodeWrapper,
+  OntologyRelationshipWrapper,
 } from '../ontology-builder/ontology-flow.types';
 import { KnowledgeGraphDataNode } from './KnowledgeGraphDataNode';
 import {
@@ -51,9 +51,9 @@ const nodeTypes: NodeTypes = {
 };
 
 type KnowledgeGraphFlowEdge = Edge<{ relationName: string }>;
-type KnowledgeGraphFlowElement = OntologyFlowNode | KnowledgeGraphFlowNode;
+type KnowledgeGraphFlowElement = OntologyNodeWrapper | KnowledgeGraphFlowNode;
 type KnowledgeGraphFlowConnection =
-  | OntologyFlowRelationship
+  | OntologyRelationshipWrapper
   | KnowledgeGraphFlowEdge;
 
 const IMPORT_INPUT_ID = 'knowledge-graph-import';
@@ -173,7 +173,7 @@ interface KnowledgeGraphState {
 
 function createAssociationEdges(
   ontology: OntologyDocument,
-): OntologyFlowRelationship[] {
+): OntologyRelationshipWrapper[] {
   return ontology.nodes.flatMap((node) =>
     node.associations.flatMap((association, associationIndex) => {
       const targetIds = association.nodesAll
@@ -181,13 +181,19 @@ function createAssociationEdges(
         : association.nodeIds;
       return targetIds.map((targetNodeId) => ({
         id: `${node.id}:association:${associationIndex}:${targetNodeId}`,
+        type: 'default',
         source: node.id,
         target: targetNodeId,
         label: association.relation,
         data: {
-          relation: association.relation,
-          description: association.description,
-          properties: [],
+          ontologyRelationship: {
+            id: `${node.id}:association:${associationIndex}:${targetNodeId}`,
+            sourceNodeId: node.id,
+            targetNodeId,
+            relation: association.relation,
+            description: association.description,
+            properties: [],
+          },
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
         style: { stroke: '#8b5cf6', strokeDasharray: '5 4' },
@@ -196,9 +202,9 @@ function createAssociationEdges(
   );
 }
 
-function readKnowledgeGraph(): KnowledgeGraphState {
+async function readKnowledgeGraph(): Promise<KnowledgeGraphState> {
   try {
-    const ontology = loadOntology();
+    const ontology = await ontologyService.load();
     if (!ontology) {
       return {
         ontology: null,
@@ -247,7 +253,13 @@ function readKnowledgeGraph(): KnowledgeGraphState {
 
 function KnowledgeGraphWorkspace() {
   const { setSidebarContent } = useOutletContext<AppLayoutContext>();
-  const [initialState] = useState(readKnowledgeGraph);
+  const [initialState] = useState<KnowledgeGraphState>({
+    ontology: null,
+    graphData: null,
+    nodes: [],
+    edges: [],
+    error: '',
+  });
   const [ontology, setOntology] = useState(initialState.ontology);
   const [nodes, setNodes, onNodesChange] = useNodesState<
     KnowledgeGraphFlowElement
@@ -266,8 +278,12 @@ function KnowledgeGraphWorkspace() {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const refreshOntology = () => {
-      const state = readKnowledgeGraph();
+    let active = true;
+    const refreshOntology = async () => {
+      const state = await readKnowledgeGraph();
+      if (!active) {
+        return;
+      }
       setOntology(state.ontology);
       setGraphData(state.graphData);
       setNodes(state.nodes);
@@ -276,8 +292,12 @@ function KnowledgeGraphWorkspace() {
       setSelectedNodeId(null);
     };
 
+    void refreshOntology();
     window.addEventListener('storage', refreshOntology);
-    return () => window.removeEventListener('storage', refreshOntology);
+    return () => {
+      active = false;
+      window.removeEventListener('storage', refreshOntology);
+    };
   }, [setEdges, setNodes]);
 
   const selectedRecord = graphData?.nodes.find(

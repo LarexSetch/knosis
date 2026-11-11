@@ -7,6 +7,7 @@ import {
   useEdgesState,
   useNodesState,
   type Connection,
+  type NodeChange,
 } from '@xyflow/react';
 import { Download, FolderOpen, Plus, Save, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,24 +22,22 @@ import {
   mapGraphToOntology,
   mapOntologyToGraph,
 } from './ontology-mapper';
-import {
-  exportOntology,
-  importOntology,
-  loadOntology,
-  saveOntology,
-} from './ontology-service';
+import { ontologyService } from './ontology-service';
+import { exportOntology, importOntology } from './ontology-file-service';
 import {
   OntologyNodeStatus,
   type OntologyMetadata,
+  type OntologyNode as OntologyNodeModel,
+  type OntologyRelationship,
 } from '../../../../backend/src/ontology/ontology.types';
 import type {
-  OntologyFlowNode,
-  OntologyFlowRelationship,
+  OntologyNodeWrapper,
+  OntologyRelationshipWrapper,
 } from './ontology-flow.types';
 
 const nodeTypes = { ontology: OntologyNode };
 
-const initialNodes: OntologyFlowNode[] = [
+const initialNodes: OntologyNodeWrapper[] = [
   {
     id: 'documentation',
     type: 'ontology',
@@ -46,22 +45,28 @@ const initialNodes: OntologyFlowNode[] = [
     deletable: false,
     position: { x: 80, y: 120 },
     data: {
-      color: '#a1a1aa',
-      name: 'Документация',
-      description: 'Документ, содержащий исходную информацию для построения онтологии.',
-      status: OntologyNodeStatus.ASSOCIATED,
-      properties: [
-        { name: 'Название', type: 'string', description: 'Название документа.' },
-        { name: 'Страниц', type: 'number', description: 'Количество страниц.' },
-      ],
-      associations: [
-        {
-          relation: 'DEFINES',
-          description: 'Документация определяет структуру онтологии.',
-          nodeIds: ['ontology'],
-          nodesAll: false,
+      ontologyNode: {
+        id: 'documentation',
+        name: 'Документация',
+        description: 'Документ, содержащий исходную информацию для построения онтологии.',
+        status: OntologyNodeStatus.ASSOCIATED,
+        properties: [
+          { name: 'Название', type: 'string', description: 'Название документа.' },
+          { name: 'Страниц', type: 'number', description: 'Количество страниц.' },
+        ],
+        associations: [
+          {
+            relation: 'DEFINES',
+            description: 'Документация определяет структуру онтологии.',
+            nodeIds: ['ontology'],
+            nodesAll: false,
+          },
+        ],
+        meta: {
+          color: '#a1a1aa',
+          position: { x: 80, y: 120 },
         },
-      ],
+      },
     },
   },
   {
@@ -71,16 +76,22 @@ const initialNodes: OntologyFlowNode[] = [
     deletable: false,
     position: { x: 380, y: 120 },
     data: {
-      color: '#789a83',
-      name: 'Онтология',
-      description: 'Формальная модель понятий предметной области и связей между ними.',
-      status: OntologyNodeStatus.DETACHED,
-      properties: [
-        { name: 'Название', type: 'string', description: 'Название онтологии.' },
-        { name: 'Синонимы', type: 'string', description: 'Альтернативные названия.' },
-        { name: 'Активна', type: 'boolean', description: 'Признак активности.' },
-      ],
-      associations: [],
+      ontologyNode: {
+        id: 'ontology',
+        name: 'Онтология',
+        description: 'Формальная модель понятий предметной области и связей между ними.',
+        status: OntologyNodeStatus.DETACHED,
+        properties: [
+          { name: 'Название', type: 'string', description: 'Название онтологии.' },
+          { name: 'Синонимы', type: 'string', description: 'Альтернативные названия.' },
+          { name: 'Активна', type: 'boolean', description: 'Признак активности.' },
+        ],
+        associations: [],
+        meta: {
+          color: '#789a83',
+          position: { x: 380, y: 120 },
+        },
+      },
     },
   },
 ];
@@ -94,29 +105,9 @@ function createDefaultMetadata(): OntologyMetadata {
 }
 
 function createInitialWorkspaceState() {
-  try {
-    const ontology = loadOntology();
-    if (ontology) {
-      return {
-        ...mapOntologyToGraph(ontology),
-        metadata: ontology.metadata,
-        fileStatus: '',
-      };
-    }
-  } catch (error) {
-    return {
-      nodes: initialNodes,
-      edges: [] as OntologyFlowRelationship[],
-      metadata: createDefaultMetadata(),
-      fileStatus: error instanceof Error
-        ? `Не удалось загрузить сохранённую онтологию: ${error.message}`
-        : 'Не удалось загрузить сохранённую онтологию.',
-    };
-  }
-
   return {
     nodes: initialNodes,
-    edges: [] as OntologyFlowRelationship[],
+    edges: [] as OntologyRelationshipWrapper[],
     metadata: createDefaultMetadata(),
     fileStatus: '',
   };
@@ -126,7 +117,7 @@ function OntologyWorkspace() {
   const { setSidebarActions } = useOutletContext<AppLayoutContext>();
   const [initialState] = useState(createInitialWorkspaceState);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialState.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyFlowRelationship>(
+  const [edges, setEdges, onEdgesChange] = useEdgesState<OntologyRelationshipWrapper>(
     initialState.edges,
   );
   const [metadata, setMetadata] = useState(initialState.metadata);
@@ -138,7 +129,7 @@ function OntologyWorkspace() {
   const nodesWithStatus = useMemo(() => {
     const associatedNodeIds = new Set<string>();
     for (const node of nodes) {
-      for (const association of node.data.associations) {
+      for (const association of node.data.ontologyNode.associations) {
         const targetIds = association.nodesAll
           ? nodes.map((targetNode) => targetNode.id)
           : association.nodeIds;
@@ -155,17 +146,47 @@ function OntologyWorkspace() {
     return nodes.map((node) => ({
       ...node,
       data: {
-        ...node.data,
-        status: associatedNodeIds.has(node.id)
-          ? OntologyNodeStatus.ASSOCIATED
-          : relatedNodeIds.has(node.id)
-            ? OntologyNodeStatus.RELATED
-            : OntologyNodeStatus.DETACHED,
+        ontologyNode: {
+          ...node.data.ontologyNode,
+          status: associatedNodeIds.has(node.id)
+            ? OntologyNodeStatus.ASSOCIATED
+            : relatedNodeIds.has(node.id)
+              ? OntologyNodeStatus.RELATED
+              : OntologyNodeStatus.DETACHED,
+        },
       },
     }));
   }, [edges, nodes]);
   const selectedNode = nodesWithStatus.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<OntologyNodeWrapper>[]) => {
+      onNodesChange(changes);
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          const { meta } = node.data.ontologyNode;
+          if (
+            meta.position.x === node.position.x &&
+            meta.position.y === node.position.y
+          ) {
+            return node;
+          }
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              ontologyNode: {
+                ...node.data.ontologyNode,
+                meta: { ...meta, position: { ...node.position } },
+              },
+            },
+          };
+        }),
+      );
+    },
+    [onNodesChange, setNodes],
+  );
 
   const showFileStatus = useCallback((status: string) => {
     if (fileStatusTimeoutRef.current !== null) {
@@ -187,6 +208,32 @@ function OntologyWorkspace() {
     [],
   );
 
+  useEffect(() => {
+    let active = true;
+    void ontologyService.load()
+      .then((ontology) => {
+        if (!active || !ontology) {
+          return;
+        }
+        const graph = mapOntologyToGraph(ontology);
+        setNodes(graph.nodes);
+        setEdges(graph.edges);
+        setMetadata(ontology.metadata);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          showFileStatus(
+            error instanceof Error
+              ? `Не удалось загрузить сохранённую онтологию: ${error.message}`
+              : 'Не удалось загрузить сохранённую онтологию.',
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [setEdges, setNodes, showFileStatus]);
+
   const createOntologyDocument = () => {
     const updatedMetadata = {
       ...metadata,
@@ -197,10 +244,10 @@ function OntologyWorkspace() {
     return ontology;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      saveOntology(createOntologyDocument());
-      showFileStatus('Онтология сохранена в браузере.');
+      await ontologyService.save(createOntologyDocument());
+      showFileStatus('Онтология сохранена на сервере.');
     } catch (error) {
       showFileStatus(
         error instanceof Error ? error.message : 'Не удалось сохранить онтологию.',
@@ -208,9 +255,9 @@ function OntologyWorkspace() {
     }
   };
 
-  const handleLoad = () => {
+  const handleLoad = async () => {
     try {
-      const ontology = loadOntology();
+      const ontology = await ontologyService.load();
       if (!ontology) {
         showFileStatus('Сохранённая онтология не найдена.');
         return;
@@ -263,13 +310,22 @@ function OntologyWorkspace() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      const id = crypto.randomUUID();
+      const relationship: OntologyRelationship = {
+        id,
+        sourceNodeId: connection.source,
+        targetNodeId: connection.target,
+        relation: '',
+        description: '',
+        properties: [],
+      };
       setEdges((currentEdges) =>
         addEdge(
           {
             ...connection,
-            id: crypto.randomUUID(),
+            id,
             label: '',
-            data: { relation: '', description: '', properties: [] },
+            data: { ontologyRelationship: relationship },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               color: '#548064',
@@ -284,18 +340,26 @@ function OntologyWorkspace() {
 
   const addNode = () => {
     const id = crypto.randomUUID();
-    const newNode: OntologyFlowNode = {
+    const position = { x: 100 + nodes.length * 40, y: 240 + nodes.length * 40 };
+    const ontologyNode: OntologyNodeModel = {
+      id,
+      name: '',
+      description: '',
+      status: OntologyNodeStatus.DETACHED,
+      properties: [],
+      associations: [],
+      meta: {
+        color: '#789a83',
+        position,
+      },
+    };
+    const newNode: OntologyNodeWrapper = {
       id,
       type: 'ontology',
       deletable: false,
-      position: { x: 100 + nodes.length * 40, y: 240 + nodes.length * 40 },
+      position,
       data: {
-        color: '#789a83',
-        name: '',
-        description: '',
-        status: OntologyNodeStatus.DETACHED,
-        properties: [],
-        associations: [],
+        ontologyNode,
       },
     };
     setNodes((currentNodes) => [...currentNodes, newNode]);
@@ -310,10 +374,13 @@ function OntologyWorkspace() {
           ...node,
           data: {
             ...node.data,
-            associations: node.data.associations.map((association) => ({
+            ontologyNode: {
+              ...node.data.ontologyNode,
+              associations: node.data.ontologyNode.associations.map((association) => ({
               ...association,
               nodeIds: association.nodeIds.filter((target) => target !== nodeId),
-            })),
+              })),
+            },
           },
         })),
     );
@@ -378,7 +445,7 @@ function OntologyWorkspace() {
             <ReactFlow
               nodes={nodesWithStatus}
               edges={edges}
-              onNodesChange={onNodesChange}
+              onNodesChange={handleNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onInit={(instance) => void instance.fitView({ padding: 0.2 })}
@@ -412,7 +479,11 @@ function OntologyWorkspace() {
                 setEdges((currentEdges) =>
                   currentEdges.map((edge) =>
                     edge.id === selectedEdge.id
-                      ? { ...edge, data, label: data.relation }
+                      ? {
+                          ...edge,
+                          data: { ontologyRelationship: data },
+                          label: data.relation,
+                        }
                       : edge,
                   ),
                 )
@@ -425,6 +496,13 @@ function OntologyWorkspace() {
                           ...edge,
                           source: edge.target,
                           target: edge.source,
+                          data: {
+                            ontologyRelationship: {
+                              ...edge.data.ontologyRelationship,
+                              sourceNodeId: edge.target,
+                              targetNodeId: edge.source,
+                            },
+                          },
                           sourceHandle: edge.targetHandle,
                           targetHandle: edge.sourceHandle,
                         }
@@ -438,10 +516,12 @@ function OntologyWorkspace() {
               node={selectedNode}
               availableNodes={nodes}
               onDelete={() => deleteNode(selectedNode.id)}
-              onChange={(data) =>
+              onChange={(ontologyNode) =>
                 setNodes((currentNodes) =>
                   currentNodes.map((node) =>
-                    node.id === selectedNode.id ? { ...node, data } : node,
+                    node.id === selectedNode.id
+                      ? { ...node, data: { ontologyNode } }
+                      : node,
                   ),
                 )
               }
