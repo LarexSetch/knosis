@@ -25,7 +25,6 @@ export interface OntologyRelationship {
   sourceNodeId: string;
   targetNodeId: string;
   relation: string;
-  properties: OntologyProperty[];
   description: string;
 }
 
@@ -45,6 +44,7 @@ export enum OntologyNodeStatus {
 export type OntologyPropertyType = 'string' | 'number' | 'boolean';
 
 export interface OntologyAssociation {
+  id: string;
   relation: string;
   description: string;
   nodeIds: string[];

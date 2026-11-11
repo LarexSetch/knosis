@@ -458,30 +458,6 @@
   gap: 7px;
 }
 
-.knowledge-graph-details__relationship-properties {
-  display: grid;
-  gap: 4px;
-  padding-top: 2px;
-}
-
-.knowledge-graph-details__relationship-properties > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #a1a1aa;
-  font-size: 9px;
-}
-
-.knowledge-graph-details__relationship-properties code {
-  color: #71717a;
-  font-size: 9px;
-}
-
-.knowledge-graph-details__relationship-properties small {
-  color: #71717a;
-  font-size: 8px;
-}
-
 .knowledge-graph-details__properties li,
 .knowledge-graph-details__relationships li {
   display: grid;

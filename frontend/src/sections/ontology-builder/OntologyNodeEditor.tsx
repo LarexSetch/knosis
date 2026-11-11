@@ -208,7 +208,13 @@ export function OntologyNodeEditor({
             updateNode({
               associations: [
                 ...ontologyNode.associations,
-                { relation: '', description: '', nodeIds: [], nodesAll: false },
+                {
+                  id: crypto.randomUUID(),
+                  relation: '',
+                  description: '',
+                  nodeIds: [],
+                  nodesAll: false,
+                },
               ],
             })
           }
@@ -220,7 +226,7 @@ export function OntologyNodeEditor({
 
       <div className="ontology-editor__properties">
         {ontologyNode.associations.map((association, index) => (
-          <section className="ontology-editor__property" key={index}>
+          <section className="ontology-editor__property" key={association.id}>
             <div className="ontology-editor__property-row">
               <Input
                 className="ontology-editor__control"

@@ -8,7 +8,10 @@ import {
   Param,
   Put,
 } from '@nestjs/common';
-import { isOntologyDocument } from './ontology-document.validator';
+import {
+  isOntologyDocument,
+  normalizeOntologyDocument,
+} from './ontology-document.validator';
 import {
   isValidOntologyId,
   ONTOLOGY_STORAGE,
@@ -29,10 +32,11 @@ export class OntologyController {
     @Body() body: unknown,
   ): Promise<void> {
     this.validateId(id);
-    if (!isOntologyDocument(body)) {
+    const ontology = normalizeOntologyDocument(body);
+    if (!isOntologyDocument(ontology)) {
       throw new BadRequestException('Request body is not a valid ontology document.');
     }
-    await this.ontologyStorage.save(id, body);
+    await this.ontologyStorage.save(id, ontology);
   }
 
   @Get(':id')

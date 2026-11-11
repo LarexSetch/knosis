@@ -175,24 +175,23 @@ function createAssociationEdges(
   ontology: OntologyDocument,
 ): OntologyRelationshipWrapper[] {
   return ontology.nodes.flatMap((node) =>
-    node.associations.flatMap((association, associationIndex) => {
+    node.associations.flatMap((association) => {
       const targetIds = association.nodesAll
         ? ontology.nodes.map((targetNode) => targetNode.id)
         : association.nodeIds;
       return targetIds.map((targetNodeId) => ({
-        id: `${node.id}:association:${associationIndex}:${targetNodeId}`,
+        id: `${association.id}:${targetNodeId}`,
         type: 'default',
         source: node.id,
         target: targetNodeId,
         label: association.relation,
         data: {
           ontologyRelationship: {
-            id: `${node.id}:association:${associationIndex}:${targetNodeId}`,
+            id: `${association.id}:${targetNodeId}`,
             sourceNodeId: node.id,
             targetNodeId,
             relation: association.relation,
             description: association.description,
-            properties: [],
           },
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
@@ -314,14 +313,14 @@ function KnowledgeGraphWorkspace() {
       relationship.targetNodeId === selectedNodeId,
   ) ?? [];
   const selectedAssociations = ontology?.nodes.flatMap((sourceNode) =>
-    sourceNode.associations.flatMap((association, associationIndex) => {
+    sourceNode.associations.flatMap((association) => {
       const targetNodeIds = association.nodesAll
         ? ontology.nodes.map((node) => node.id)
         : association.nodeIds;
       return targetNodeIds.some((nodeId) => nodeId === selectedNodeId) ||
         sourceNode.id === selectedNodeId
         ? [{
-            id: `${sourceNode.id}:association:${associationIndex}`,
+            id: association.id,
             sourceNodeId: sourceNode.id,
             association,
             targetNodeIds,
@@ -869,17 +868,6 @@ function NodeDetails({
                   </div>
                   <p>{nodeNames.get(otherNodeId) || 'Без названия'}</p>
                   {relationship.description && <p>{relationship.description}</p>}
-                  {relationship.properties.length > 0 && (
-                    <div className="knowledge-graph-details__relationship-properties">
-                      {relationship.properties.map((property, index) => (
-                        <div key={`${property.name}-${index}`}>
-                          <span>{property.name}</span>
-                          <code>{property.type}</code>
-                          {property.required && <small>Обязательное</small>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </li>
               );
             })}

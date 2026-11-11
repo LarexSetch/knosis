@@ -67,7 +67,15 @@ export function mapOntologyToGraph(ontology: OntologyDocument): {
       source: relationship.sourceNodeId,
       target: relationship.targetNodeId,
       label: relationship.relation,
-      data: { ontologyRelationship: relationship },
+      data: {
+        ontologyRelationship: {
+          id: relationship.id,
+          sourceNodeId: relationship.sourceNodeId,
+          targetNodeId: relationship.targetNodeId,
+          relation: relationship.relation,
+          description: relationship.description,
+        },
+      },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#548064' },
     });
   }
@@ -99,6 +107,10 @@ export function mapOntologyToGraph(ontology: OntologyDocument): {
       data: {
         ontologyNode: {
           ...node,
+          associations: node.associations.map((association, index) => ({
+            ...association,
+            id: association.id || `legacy-${node.id}-${index}`,
+          })),
           status: associatedNodeIds.has(node.id)
             ? OntologyNodeStatus.ASSOCIATED
             : relatedNodeIds.has(node.id)

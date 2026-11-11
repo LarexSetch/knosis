@@ -13,7 +13,10 @@ import {
   isValidOntologyId,
   type OntologyStorage,
 } from './ontology-storage.interface';
-import { isOntologyDocument } from './ontology-document.validator';
+import {
+  isOntologyDocument,
+  normalizeOntologyDocument,
+} from './ontology-document.validator';
 import type { OntologyDocument } from './ontology.types';
 
 @Injectable()
@@ -80,10 +83,11 @@ export class FileOntologyStorageService implements OntologyStorage {
       );
     }
 
-    if (!isOntologyDocument(parsed)) {
+    const ontology = normalizeOntologyDocument(parsed);
+    if (!isOntologyDocument(ontology)) {
       throw new Error(`Stored ontology "${id}" has an invalid document shape.`);
     }
-    return parsed;
+    return ontology;
   }
 
   private getFilePath(id: string): string {

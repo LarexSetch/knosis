@@ -56,6 +56,7 @@ const initialNodes: OntologyNodeWrapper[] = [
         ],
         associations: [
           {
+            id: 'documentation-defines-ontology',
             relation: 'DEFINES',
             description: 'Документация определяет структуру онтологии.',
             nodeIds: ['ontology'],
@@ -317,7 +318,6 @@ function OntologyWorkspace() {
         targetNodeId: connection.target,
         relation: '',
         description: '',
-        properties: [],
       };
       setEdges((currentEdges) =>
         addEdge(

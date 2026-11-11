@@ -60,6 +60,7 @@ export function isOntologyDocument(value: unknown): value is OntologyDocument {
       !node.associations.every(
         (association) =>
           isRecord(association) &&
+          typeof association.id === 'string' &&
           typeof association.relation === 'string' &&
           typeof association.description === 'string' &&
           Array.isArray(association.nodeIds) &&
@@ -97,9 +98,46 @@ export function isOntologyDocument(value: unknown): value is OntologyDocument {
         typeof relationship.targetNodeId === 'string' &&
         nodeIds.has(relationship.targetNodeId) &&
         typeof relationship.relation === 'string' &&
-        typeof relationship.description === 'string' &&
-        Array.isArray(relationship.properties) &&
-        relationship.properties.every(isOntologyProperty),
+        typeof relationship.description === 'string',
     )
   );
+}
+
+export function normalizeOntologyDocument(value: unknown): unknown {
+  if (!isRecord(value) || !Array.isArray(value.nodes)) {
+    return value;
+  }
+
+  const nodes = value.nodes.map((node) => {
+    if (!isRecord(node) || !Array.isArray(node.associations)) {
+      return node;
+    }
+
+    return {
+      ...node,
+      associations: node.associations.map((association, index) => {
+        if (
+          !isRecord(association) ||
+          association.id !== undefined ||
+          typeof node.id !== 'string'
+        ) {
+          return association;
+        }
+        return { ...association, id: `legacy-${node.id}-${index}` };
+      }),
+    };
+  });
+
+  const relationships = Array.isArray(value.relationships)
+    ? value.relationships.map((relationship) => {
+        if (!isRecord(relationship)) {
+          return relationship;
+        }
+        return Object.fromEntries(
+          Object.entries(relationship).filter(([key]) => key !== 'properties'),
+        );
+      })
+    : value.relationships;
+
+  return { ...value, nodes, relationships };
 }
