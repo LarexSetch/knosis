@@ -7,7 +7,9 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173',
   });
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  console.log(`Knosis backend running on http://localhost:${port}`);
 }
 
 void bootstrap();

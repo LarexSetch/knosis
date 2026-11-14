@@ -1,0 +1,23 @@
+services:
+  db:
+    image: apache/age:latest
+    container_name: knosis_postgres_age
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-knosis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-knosis_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-knosis}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - knosis_pgdata:/var/lib/postgresql
+      - ./docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-knosis} -d ${POSTGRES_DB:-knosis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  knosis_pgdata:
+    name: knosis_pgdata
