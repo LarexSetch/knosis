@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { OntologyController } from './ontology.controller';
-import { OntologyService } from './ontology.service';
+import { OntologyEntity } from './ontology.entity';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([OntologyEntity])],
   controllers: [OntologyController],
-  providers: [OntologyService],
-  exports: [OntologyService],
 })
 export class OntologyModule {}

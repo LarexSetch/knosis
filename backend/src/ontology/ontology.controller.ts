@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,7 +10,9 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { OntologyService } from './ontology.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import type {
   CreateOntologyRequest,
   DeleteOntologyRequest,
@@ -25,22 +26,36 @@ import type {
   OntologySummaryItem,
   UpdateOntologyResponse,
 } from './dto/responses.dto';
-import type { OntologyEntity } from './ontology.entity';
+import { OntologyEntity } from './ontology.entity';
 
 @Controller('ontology')
 export class OntologyController {
-  constructor(private readonly ontologyService: OntologyService) {}
+  constructor(
+    @InjectRepository(OntologyEntity)
+    private readonly ontologyRepository: Repository<OntologyEntity>,
+  ) {}
 
   @Post()
   async create(
     @Body() request: CreateOntologyRequest,
   ): Promise<CreateOntologyResponse> {
-    return this.toCreateResponse(await this.ontologyService.create(request));
+    const id = request.id || randomUUID();
+    const entity = this.ontologyRepository.create({
+      id,
+      name: request.name,
+      data: request.data,
+    });
+    const saved = await this.ontologyRepository.save(entity);
+    return this.toCreateResponse(saved);
   }
 
   @Get()
   async findAll(): Promise<ListOntologiesResponse> {
-    const entities = await this.ontologyService.findAll();
+    const entities = await this.ontologyRepository.find({
+      order: {
+        updated_at: 'DESC',
+      },
+    });
     const items: OntologySummaryItem[] = entities.map(({ id, name, created_at, updated_at }) => ({
       id,
       name,
@@ -53,7 +68,9 @@ export class OntologyController {
 
   @Get(':id')
   async findById(@Param() request: GetOntologyRequest): Promise<GetOntologyResponse> {
-    const entity = await this.ontologyService.findById(request.id);
+    const entity = await this.ontologyRepository.findOne({
+      where: { id: request.id },
+    });
     if (!entity) {
       throw new NotFoundException(`Ontology "${request.id}" was not found`);
     }
@@ -66,19 +83,29 @@ export class OntologyController {
     @Param() params: GetOntologyRequest,
     @Body() request: UpdateOntologyRequest,
   ): Promise<UpdateOntologyResponse> {
-    const entity = await this.ontologyService.update(params.id, request);
+    const entity = await this.ontologyRepository.findOne({
+      where: { id: params.id },
+    });
     if (!entity) {
       throw new NotFoundException(`Ontology "${params.id}" was not found`);
     }
 
-    return this.toUpdateResponse(entity);
+    if (request.name !== undefined) {
+      entity.name = request.name;
+    }
+    if (request.data !== undefined) {
+      entity.data = request.data;
+    }
+
+    const saved = await this.ontologyRepository.save(entity);
+    return this.toUpdateResponse(saved);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param() request: DeleteOntologyRequest): Promise<void> {
-    const deleted = await this.ontologyService.delete(request.id);
-    if (!deleted) {
+    const result = await this.ontologyRepository.delete(request.id);
+    if (!result.affected) {
       throw new NotFoundException(`Ontology "${request.id}" was not found`);
     }
   }

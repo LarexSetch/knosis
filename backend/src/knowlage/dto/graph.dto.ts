@@ -1,4 +1,7 @@
-export interface KnowledgeGraphDocument {
+export interface KnowlageGraph {
+  id: string;
+  name: string;
+  summary: string;
   nodes: Node[];
   relations: Relation[];
   contexts: Context[];
