@@ -1,10 +1,12 @@
 export interface KnowlageGraph {
   id: string;
+  ontologyId: string;
   name: string;
   summary: string;
   nodes: Node[];
   relations: Relation[];
   contexts: Context[];
+  contextRelations: ContextNodeRelation[];
 }
 
 export type KnowledgeGraphDocument = KnowlageGraph;
@@ -30,8 +32,8 @@ export interface Meta {
 
 export interface Relation {
   id: string;
-  sourceNodeId: string;
-  targetNodeId: string;
+  sourceId: string;
+  targetId: string;
   ontology: {
     id: string;
     relationId: string;
@@ -45,11 +47,11 @@ export interface Context {
     id: string;
     contextId: string;
   };
-  nodes: ContextNodeRelation[];
 }
 
 export interface ContextNodeRelation {
   id: string;
   name: string;
-  nodeId: string;
+  sourceId: string;
+  targetId: string;
 }

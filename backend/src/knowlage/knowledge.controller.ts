@@ -28,7 +28,7 @@ import type {
   KnowledgeSummaryItem,
   UpdateKnowledgeResponse,
 } from './dto/responses.dto';
-import type { KnowlageGraph } from './dto/graph.dto';
+import type { KnowledgeGraph } from './dto/graph.dto';
 import { KnowledgeEntity } from './knowledge.entity';
 import { GraphServiceImpl } from './knowlage.service';
 
@@ -46,34 +46,8 @@ export class KnowledgeController {
   async create(
     @Body() request: CreateKnowledgeRequest,
   ): Promise<CreateKnowledgeResponse> {
-    const id = request.id || request.document?.id || request.graph?.id || randomUUID();
-    const name = request.name || request.document?.name || request.graph?.name || '';
-    const summary = request.summary ?? request.document?.summary ?? request.graph?.summary ?? '';
-
-    const entity = this.knowledgeRepository.create({
-      id,
-      name,
-      summary,
-    });
+    const entity = this.knowledgeRepository.create({id: randomUUID(), name: request.name, summary: request.summary});
     const saved = await this.knowledgeRepository.save(entity);
-
-    const graphData: KnowlageGraph | undefined =
-      request.document ??
-      request.graph ??
-      (request.nodes
-        ? {
-            id: saved.id,
-            name: saved.name,
-            summary: saved.summary,
-            nodes: request.nodes,
-            relations: request.relations || [],
-            contexts: request.contexts || [],
-          }
-        : undefined);
-
-    if (graphData) {
-      await this.processGraphData(saved, graphData);
-    }
 
     return this.toCreateResponse(saved);
   }
@@ -109,7 +83,7 @@ export class KnowledgeController {
   }
 
   @Get(':id/graph')
-  async getGraph(@Param() request: GetKnowledgeRequest): Promise<KnowlageGraph> {
+  async getGraph(@Param() request: GetKnowledgeRequest): Promise<KnowledgeGraph> {
     const entity = await this.knowledgeRepository.findOne({
       where: { id: request.id },
     });
@@ -119,7 +93,43 @@ export class KnowledgeController {
 
     const ontology = (await this.ontologyRepository.find({ take: 1 }))[0] ?? null;
     const graphService = new GraphServiceImpl(entity, ontology, this.databaseService);
-    return graphService.document();
+
+    const [nodes, relations, contexts, contextRelations] = await Promise.all([
+      graphService.findNodes(),
+      graphService.findRelations(),
+      graphService.findContexts(),
+      graphService.findContextRelations(),
+    ]);
+
+    return {
+      id: entity.id,
+      ontologyId: ontology?.id ?? '',
+      name: entity.name,
+      summary: entity.summary,
+      nodes,
+      relations,
+      contexts,
+      contextRelations,
+    };
+  }
+
+
+  @Put(':id/graph')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async putGraph(@Param() request: GetKnowledgeRequest, @Body() graph: KnowledgeGraph): Promise<void> {
+    const entity = await this.knowledgeRepository.findOne({
+      where: { id: request.id },
+    });
+    if (!entity) {
+      throw new NotFoundException(`Knowledge "${request.id}" was not found`);
+    }
+
+    const ontology = (await this.ontologyRepository.find({ take: 1 }))[0] ?? null;
+    const graphService = new GraphServiceImpl(entity, ontology, this.databaseService);
+
+    graph.nodes.forEach((n) => graphService.createNode(n));
+    graph.contexts.forEach((c) => graphService.contextualize(c, graph.contextRelations.filter((v) => v.contextId === c.id)));
+    graph.relations.forEach((r) => graphService.relate(r))
   }
 
   @Put(':id')
@@ -134,32 +144,9 @@ export class KnowledgeController {
       throw new NotFoundException(`Knowledge "${params.id}" was not found`);
     }
 
-    if (request.name !== undefined) {
-      entity.name = request.name;
-    }
-    if (request.summary !== undefined) {
-      entity.summary = request.summary;
-    }
-
+    entity.name = request.name;
+    entity.summary = request.summary;
     const saved = await this.knowledgeRepository.save(entity);
-
-    const graphData: KnowlageGraph | undefined =
-      request.document ??
-      request.graph ??
-      (request.nodes
-        ? {
-            id: saved.id,
-            name: saved.name,
-            summary: saved.summary,
-            nodes: request.nodes,
-            relations: request.relations || [],
-            contexts: request.contexts || [],
-          }
-        : undefined);
-
-    if (graphData) {
-      await this.processGraphData(saved, graphData);
-    }
 
     return this.toUpdateResponse(saved);
   }
@@ -170,23 +157,6 @@ export class KnowledgeController {
     const result = await this.knowledgeRepository.delete(request.id);
     if (!result.affected) {
       throw new NotFoundException(`Knowledge "${request.id}" was not found`);
-    }
-  }
-
-  private async processGraphData(knowledge: KnowledgeEntity, graphData: KnowlageGraph): Promise<void> {
-    const ontologyId = graphData.nodes?.[0]?.ontology?.id || graphData.relations?.[0]?.ontology?.id;
-    let ontology: OntologyEntity | null = null;
-    if (ontologyId) {
-      ontology = await this.ontologyRepository.findOne({ where: { id: ontologyId } });
-    }
-    if (!ontology) {
-      const all = await this.ontologyRepository.find({ take: 1 });
-      ontology = all[0] ?? null;
-    }
-
-    if (ontology) {
-      const graphService = new GraphServiceImpl(knowledge, ontology, this.databaseService);
-      await graphService.saveGraph(graphData);
     }
   }
 
