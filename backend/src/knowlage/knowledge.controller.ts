@@ -13,6 +13,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
+import { DatabaseService } from '../database/database.service';
+import { OntologyEntity } from '../ontology/ontology.entity';
 import type {
   CreateKnowledgeRequest,
   DeleteKnowledgeRequest,
@@ -26,30 +28,53 @@ import type {
   KnowledgeSummaryItem,
   UpdateKnowledgeResponse,
 } from './dto/responses.dto';
+import type { KnowlageGraph } from './dto/graph.dto';
 import { KnowledgeEntity } from './knowledge.entity';
+import { GraphServiceImpl } from './knowlage.service';
 
 @Controller(['knowledge', 'knowlage'])
 export class KnowledgeController {
   constructor(
     @InjectRepository(KnowledgeEntity)
     private readonly knowledgeRepository: Repository<KnowledgeEntity>,
+    @InjectRepository(OntologyEntity)
+    private readonly ontologyRepository: Repository<OntologyEntity>,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   @Post()
   async create(
     @Body() request: CreateKnowledgeRequest,
   ): Promise<CreateKnowledgeResponse> {
-    // KnowledgeGraphDocument data is received here, but not saved directly into the knowledge entity
-    // (reserved for graph interface/algorithm).
-      // Future graph processing algorithm/interface hook:
-      // await this.graphService.process(id, graphData);
+    const id = request.id || request.document?.id || request.graph?.id || randomUUID();
+    const name = request.name || request.document?.name || request.graph?.name || '';
+    const summary = request.summary ?? request.document?.summary ?? request.graph?.summary ?? '';
 
     const entity = this.knowledgeRepository.create({
-      id: randomUUID(),
-      name: request.name,
-      summary: request.summary,
+      id,
+      name,
+      summary,
     });
     const saved = await this.knowledgeRepository.save(entity);
+
+    const graphData: KnowlageGraph | undefined =
+      request.document ??
+      request.graph ??
+      (request.nodes
+        ? {
+            id: saved.id,
+            name: saved.name,
+            summary: saved.summary,
+            nodes: request.nodes,
+            relations: request.relations || [],
+            contexts: request.contexts || [],
+          }
+        : undefined);
+
+    if (graphData) {
+      await this.processGraphData(saved, graphData);
+    }
+
     return this.toCreateResponse(saved);
   }
 
@@ -83,6 +108,20 @@ export class KnowledgeController {
     return this.toGetResponse(entity);
   }
 
+  @Get(':id/graph')
+  async getGraph(@Param() request: GetKnowledgeRequest): Promise<KnowlageGraph> {
+    const entity = await this.knowledgeRepository.findOne({
+      where: { id: request.id },
+    });
+    if (!entity) {
+      throw new NotFoundException(`Knowledge "${request.id}" was not found`);
+    }
+
+    const ontology = (await this.ontologyRepository.find({ take: 1 }))[0] ?? null;
+    const graphService = new GraphServiceImpl(entity, ontology, this.databaseService);
+    return graphService.document();
+  }
+
   @Put(':id')
   async update(
     @Param() params: GetKnowledgeRequest,
@@ -95,13 +134,33 @@ export class KnowledgeController {
       throw new NotFoundException(`Knowledge "${params.id}" was not found`);
     }
 
-    entity.name = request.name;
-    entity.summary = request.summary;
-
-    // Graph document data handling hook
-    // Future graph processing algorithm/interface hook
+    if (request.name !== undefined) {
+      entity.name = request.name;
+    }
+    if (request.summary !== undefined) {
+      entity.summary = request.summary;
+    }
 
     const saved = await this.knowledgeRepository.save(entity);
+
+    const graphData: KnowlageGraph | undefined =
+      request.document ??
+      request.graph ??
+      (request.nodes
+        ? {
+            id: saved.id,
+            name: saved.name,
+            summary: saved.summary,
+            nodes: request.nodes,
+            relations: request.relations || [],
+            contexts: request.contexts || [],
+          }
+        : undefined);
+
+    if (graphData) {
+      await this.processGraphData(saved, graphData);
+    }
+
     return this.toUpdateResponse(saved);
   }
 
@@ -111,6 +170,23 @@ export class KnowledgeController {
     const result = await this.knowledgeRepository.delete(request.id);
     if (!result.affected) {
       throw new NotFoundException(`Knowledge "${request.id}" was not found`);
+    }
+  }
+
+  private async processGraphData(knowledge: KnowledgeEntity, graphData: KnowlageGraph): Promise<void> {
+    const ontologyId = graphData.nodes?.[0]?.ontology?.id || graphData.relations?.[0]?.ontology?.id;
+    let ontology: OntologyEntity | null = null;
+    if (ontologyId) {
+      ontology = await this.ontologyRepository.findOne({ where: { id: ontologyId } });
+    }
+    if (!ontology) {
+      const all = await this.ontologyRepository.find({ take: 1 });
+      ontology = all[0] ?? null;
+    }
+
+    if (ontology) {
+      const graphService = new GraphServiceImpl(knowledge, ontology, this.databaseService);
+      await graphService.saveGraph(graphData);
     }
   }
 

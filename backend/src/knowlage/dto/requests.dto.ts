@@ -1,12 +1,14 @@
-import type { KnowlageGraph, Node, Relation, Context } from './graph.dto';
+import type { Context, KnowlageGraph, Node, Relation } from './graph.dto';
 
 export interface CreateKnowledgeRequest {
   id?: string;
   name: string;
   summary: string;
-  nodes: Node[];
-  relations: Relation[];
-  contexts: Context[];
+  nodes?: Node[];
+  relations?: Relation[];
+  contexts?: Context[];
+  graph?: KnowlageGraph;
+  document?: KnowlageGraph;
 }
 
 export interface GetKnowledgeRequest {
@@ -14,11 +16,13 @@ export interface GetKnowledgeRequest {
 }
 
 export interface UpdateKnowledgeRequest {
-  name: string;
-  summary: string;
-  nodes: Node[];
-  relations: Relation[];
-  contexts: Context[];
+  name?: string;
+  summary?: string;
+  nodes?: Node[];
+  relations?: Relation[];
+  contexts?: Context[];
+  graph?: KnowlageGraph;
+  document?: KnowlageGraph;
 }
 
 export interface DeleteKnowledgeRequest {
