@@ -1,15 +1,25 @@
+import { InjectRepository } from '@nestjs/typeorm';
 import type { PoolClient } from 'pg';
+import { Repository } from 'typeorm';
 import { DatabaseService } from '../database/database.service';
-import type { OntologyEntity } from '../ontology/ontology.entity';
+import { OntologyEntity } from '../ontology/ontology.entity';
 import type {
   Context,
   ContextNodeRelation,
+  KnowledgeGraph,
   Node,
   Relation,
 } from './dto/graph.dto';
-import type { KnowledgeEntity } from './knowledge.entity';
+import { KnowledgeEntity } from './knowledge.entity';
+
+export const GRAPH_SERVICE_TOKEN = 'GraphService';
 
 export interface GraphService {
+  save(graph: KnowledgeGraph): Promise<void>;
+  load(id: string): Promise<KnowledgeGraph>;
+}
+
+interface GraphElemenetModifyer {
   createNode(node: Node): Promise<void>;
   deleteNode(node: Node): Promise<void>;
   relate(relation: Relation): Promise<void>;
@@ -21,12 +31,76 @@ export interface GraphService {
 }
 
 export class GraphServiceImpl implements GraphService {
+  constructor(
+    @InjectRepository(KnowledgeEntity)
+    private readonly knowledgeRepository: Repository<KnowledgeEntity>,
+    @InjectRepository(OntologyEntity)
+    private readonly ontologyRepository: Repository<OntologyEntity>,
+    private readonly databaseService: DatabaseService,
+  ) {}
+
+  async save(graph: KnowledgeGraph): Promise<void> {
+    const entity = await this.knowledgeRepository.findOne({ where: { id: graph.id } });
+    if (!entity) {
+      throw new Error(`Knowledge "${graph.id}" was not found`);
+    }
+
+    const ontology = await this.ontologyRepository.findOne({ where: { id: graph.ontologyId } });
+    if (!ontology) {
+      throw new Error(`Ontology "${graph.ontologyId}" was not found`);
+    }
+
+    const graphOps = new GraphElementsOps(entity, ontology, this.databaseService);
+
+    for (const n of graph.nodes) {
+      await graphOps.createNode(n);
+    }
+    for (const c of graph.contexts) {
+      const relations = graph.contextRelations.filter((v) => v.contextId === c.id);
+      await graphOps.contextualize(c, relations);
+    }
+    for (const r of graph.relations) {
+      await graphOps.relate(r);
+    }
+  }
+
+  async load(id: string): Promise<KnowledgeGraph> {
+    const entity = await this.knowledgeRepository.findOne({ where: { id } });
+    if (!entity) {
+      throw new Error(`Knowledge "${id}" was not found`);
+    }
+
+    const ontology = await this.ontologyRepository.findOne({ where: { id: entity.id } });
+
+    const graphOps = new GraphElementsOps(entity, ontology ?? null, this.databaseService);
+
+    const [nodes, relations, contexts, contextRelations] = await Promise.all([
+      graphOps.findNodes(),
+      graphOps.findRelations(),
+      graphOps.findContexts(),
+      graphOps.findContextRelations(),
+    ]);
+
+    return {
+      id: entity.id,
+      ontologyId: ontology?.id ?? '',
+      name: entity.name,
+      summary: entity.summary,
+      nodes,
+      relations,
+      contexts,
+      contextRelations,
+    };
+  }
+}
+
+class GraphElementsOps implements GraphElemenetModifyer {
   private readonly graphName: string;
 
   constructor(
     private readonly knowledge: KnowledgeEntity,
-    private readonly ontology: OntologyEntity,
-    private readonly db: DatabaseService = new DatabaseService(),
+    private readonly ontology: OntologyEntity | null,
+    private readonly db: DatabaseService,
   ) {
     this.graphName = process.env.AGE_GRAPH_NAME || 'knosis_graph';
   }
@@ -36,14 +110,14 @@ export class GraphServiceImpl implements GraphService {
     await this.withClient(async (client) => {
       await this.ensureVertexLabel(client, label);
       await this.queryCypher(client, `
-        MERGE (n:${label} { id: '{nodeId}' })
-        SET n.name = '{name}',
-            n.summary = '{summary}',
-            n.value = '{value}',
-            n.meta = '{metaJson}',
-            n.knowledge_id = '{knowledgeId}',
-            n.ontology_id = '{ontologyId}',
-            n.element_id = '{elementId}'
+        MERGE (n:${label} { id: $nodeId })
+        SET n.name = $name,
+            n.summary = $summary,
+            n.value = $value,
+            n.meta = $metaJson,
+            n.knowledge_id = $knowledgeId,
+            n.ontology_id = $ontologyId,
+            n.element_id = $elementId
         RETURN n
       `, {
         nodeId: node.id,
@@ -52,7 +126,7 @@ export class GraphServiceImpl implements GraphService {
         value: node.value,
         metaJson: JSON.stringify(node.meta),
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
         elementId: node.ontology.elementId,
       });
     });
@@ -61,7 +135,7 @@ export class GraphServiceImpl implements GraphService {
   async deleteNode(node: Node): Promise<void> {
     await this.withClient(async (client) => {
       await this.queryCypher(client, `
-        MATCH (n { id: '{nodeId}' })
+        MATCH (n { id: $nodeId })
         DETACH DELETE n
         RETURN count(n)
       `, { nodeId: node.id });
@@ -73,18 +147,18 @@ export class GraphServiceImpl implements GraphService {
     await this.withClient(async (client) => {
       await this.ensureEdgeLabel(client, label);
       await this.queryCypher(client, `
-        MATCH (a { id: '{sourceId}' })
-        MATCH (b { id: '{targetId}' })
-        MERGE (a)-[r:${label} { id: '{relationId}' }]->(b)
-        SET r.knowledge_id = '{knowledgeId}'
-            r.ontology_id = '{ontologyId}'
+        MATCH (a { id: $sourceId })
+        MATCH (b { id: $targetId })
+        MERGE (a)-[r:${label} { id: $relationId }]->(b)
+        SET r.knowledge_id = $knowledgeId,
+            r.ontology_id = $ontologyId
         RETURN r
       `, {
         relationId: relation.id,
         sourceId: relation.sourceId,
         targetId: relation.targetId,
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
       });
     });
   }
@@ -94,38 +168,38 @@ export class GraphServiceImpl implements GraphService {
     await this.withClient(async (client) => {
       await this.ensureVertexLabel(client, contextLabel);
       await this.queryCypher(client, `
-        MERGE (c:${contextLabel} { id: '{contextId}' })
-        SET c.summary = '{summary}',
-            c.knowledge_id = '{knowledgeId}',
-            c.ontology_id = '{ontologyId}',
-            c.context_id = '{contextTypeId}',
-            c.is_context_hub = 'true'
+        MERGE (c:${contextLabel} { id: $contextId })
+        SET c.summary = $summary,
+            c.knowledge_id = $knowledgeId,
+            c.ontology_id = $ontologyId,
+            c.context_id = $contextTypeId,
+            c.is_context_hub = true
         RETURN c
       `, {
         contextId: context.id,
         summary: context.summary,
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
         contextTypeId: context.ontology.contextId,
       });
 
       for (const relation of relations) {
-        const edgeLabel = this.sanitizeLabel(context.ontology.contextId);
+        const edgeLabel = this.sanitizeLabel(relation.name || context.ontology.contextId);
         await this.ensureEdgeLabel(client, edgeLabel);
         await this.queryCypher(client, `
-          MATCH (c { id: '{contextId}' })
-          MATCH (n { id: '{targetId}' })
-          MERGE (c)-[r:${edgeLabel} { id: '{relationId}' }]->(n)
-          SET r.knowledge_id = '{knowledgeId}',
-              r.ontology_id = '{ontologyId}',
-              r.is_context_edge = 'true'
+          MATCH (c { id: $contextId })
+          MATCH (n { id: $targetId })
+          MERGE (c)-[r:${edgeLabel} { id: $relationId }]->(n)
+          SET r.knowledge_id = $knowledgeId,
+              r.ontology_id = $ontologyId,
+              r.is_context_edge = true
           RETURN r
         `, {
           contextId: context.id,
           targetId: relation.targetId,
           relationId: relation.id,
           knowledgeId: this.knowledge.id,
-          ontologyId: this.ontology.id,
+          ontologyId: this.ontology?.id,
         });
       }
     });
@@ -135,7 +209,8 @@ export class GraphServiceImpl implements GraphService {
     const results = await this.withClient(async (client) => {
       return await this.queryCypher<any>(client, `
         MATCH (n)
-        WHERE n.knowledge_id = '{knowledgeId}' AND n.ontology_id = '{ontologyId}'
+        WHERE n.knowledge_id = $knowledgeId
+          AND n.ontology_id = $ontologyId
         RETURN n.id AS id,
                n.element_id AS element_id,
                n.name AS name,
@@ -145,7 +220,7 @@ export class GraphServiceImpl implements GraphService {
         ORDER BY n.name
       `, {
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
       });
     });
 
@@ -166,7 +241,8 @@ export class GraphServiceImpl implements GraphService {
     const results = await this.withClient(async (client) => {
       return await this.queryCypher<any>(client, `
         MATCH (a)-[r]->(b)
-        WHERE r.knowledge_id = '{knowledgeId}' AND r.ontology_id = '{ontologyId}'
+        WHERE r.knowledge_id = $knowledgeId
+          AND r.ontology_id = $ontologyId
         RETURN r.id AS id,
                a.id AS source_id,
                b.id AS target_id,
@@ -174,7 +250,7 @@ export class GraphServiceImpl implements GraphService {
         ORDER BY id
       `, {
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
       });
     });
 
@@ -193,16 +269,16 @@ export class GraphServiceImpl implements GraphService {
     const results = await this.withClient(async (client) => {
       return await this.queryCypher<any>(client, `
         MATCH (n)
-        WHERE n.knowledge_id = '{knowledgeId}'
-          AND n.ontology_id = '{ontologyId}'
-          AND n.is_context_hub = 'true'
+        WHERE n.knowledge_id = $knowledgeId
+          AND n.ontology_id = $ontologyId
+          AND n.is_context_hub = true
         RETURN n.id AS id,
                n.summary AS summary,
                n.context_id AS context_id
         ORDER BY n.summary
       `, {
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
       });
     });
 
@@ -220,9 +296,9 @@ export class GraphServiceImpl implements GraphService {
     const results = await this.withClient(async (client) => {
       return await this.queryCypher<any>(client, `
         MATCH (c)-[r]->(n)
-        WHERE r.knowledge_id = '{knowledgeId}'
-          AND r.ontology_id = '{ontologyId}'
-          AND r.is_context_edge = 'true'
+        WHERE r.knowledge_id = $knowledgeId
+          AND r.ontology_id = $ontologyId
+          AND r.is_context_edge = true
         RETURN r.id AS id,
                c.id AS context_id,
                n.id AS target_id,
@@ -230,7 +306,7 @@ export class GraphServiceImpl implements GraphService {
         ORDER BY r.id
       `, {
         knowledgeId: this.knowledge.id,
-        ontologyId: this.ontology.id,
+        ontologyId: this.ontology?.id,
       });
     });
 
@@ -246,18 +322,9 @@ export class GraphServiceImpl implements GraphService {
     if (!raw) return 'Label';
     const cleaned = raw.trim().replace(/[^a-zA-Z0-9_]/g, '_');
     if (/^[0-9]/.test(cleaned)) {
-      return `_${cleaned}`.slice(0, 63);
+      return '_' + cleaned.slice(0, 63);
     }
     return cleaned.slice(0, 63) || 'Label';
-  }
-
-  private escapeCypher(value: string | undefined | null): string {
-    if (value === undefined || value === null) return '';
-    return String(value)
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r');
   }
 
   private async withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -275,11 +342,18 @@ export class GraphServiceImpl implements GraphService {
   private async queryCypher<T = any>(
     client: PoolClient,
     cypherQuery: string,
-    substitutions?: Record<string, string>,
+    params: Record<string, string | number | boolean | null | undefined>,
   ): Promise<T[]> {
-    const escaped = this.escapeAndSubstitute(cypherQuery, substitutions);
-    const sql = `SELECT * FROM cypher('${this.graphName}', $cypher$ ${escaped} $cypher$) as (result agtype);`;
-    const res = await client.query(sql);
+    const keys = Object.keys(params);
+    const values = keys.map((k) => params[k]);
+
+    let sql = cypherQuery;
+    for (let i = 0; i < keys.length; i++) {
+      sql = sql.replace(`$${keys[i]}`, `$${i + 1}`);
+    }
+
+    const querySql = `SELECT * FROM cypher('${this.graphName}', $cypher$, $params$) as (result agtype);`;
+    const res = await client.query(querySql, [sql, JSON.stringify(values)]);
     return res.rows.map((row) => this.parseAgtype(row.result));
   }
 
@@ -297,59 +371,49 @@ export class GraphServiceImpl implements GraphService {
     return value;
   }
 
-  private escapeAndSubstitute(query: string, substitutions?: Record<string, string>): string {
-    if (!substitutions) return query;
-    let result = query;
-    for (const [key, value] of Object.entries(substitutions)) {
-      const escaped = this.escapeCypher(value);
-      result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), escaped);
-    }
-    return result;
-  }
-
   private async ensureGraph(client: PoolClient): Promise<void> {
-    const sql = this.escapeAndSubstitute(`
+    const sql = `
       DO $$
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM ag_catalog.ag_graph WHERE name = '{graphName}') THEN
-          PERFORM create_graph('{graphName}');
+        IF NOT EXISTS (SELECT 1 FROM ag_catalog.ag_graph WHERE name = $1) THEN
+          PERFORM create_graph($1);
         END IF;
       END $$;
-    `, { graphName: this.graphName });
-    await client.query(sql);
+    `;
+    await client.query(sql, [this.graphName]);
   }
 
   private async ensureVertexLabel(client: PoolClient, label: string): Promise<void> {
     const safeLabel = this.sanitizeLabel(label);
-    const sql = this.escapeAndSubstitute(`
+    const sql = `
       DO $$
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM ag_catalog.ag_label
-          WHERE name = '{label}'
-            AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = '{graphName}')
+          WHERE name = $1
+            AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $2)
         ) THEN
-          PERFORM create_vlabel('{graphName}', '{label}');
+          PERFORM create_vlabel($2, $1);
         END IF;
       END $$;
-    `, { label: safeLabel, graphName: this.graphName });
-    await client.query(sql);
+    `;
+    await client.query(sql, [safeLabel, this.graphName]);
   }
 
   private async ensureEdgeLabel(client: PoolClient, label: string): Promise<void> {
     const safeLabel = this.sanitizeLabel(label);
-    const sql = this.escapeAndSubstitute(`
+    const sql = `
       DO $$
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM ag_catalog.ag_label
-          WHERE name = '{label}'
-            AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = '{graphName}')
+          WHERE name = $1
+            AND graph = (SELECT graphid FROM ag_catalog.ag_graph WHERE name = $2)
         ) THEN
-          PERFORM create_elabel('{graphName}', '{label}');
+          PERFORM create_elabel($2, $1);
         END IF;
       END $$;
-    `, { label: safeLabel, graphName: this.graphName });
-    await client.query(sql);
+    `;
+    await client.query(sql, [safeLabel, this.graphName]);
   }
 }

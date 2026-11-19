@@ -10,6 +10,7 @@ export interface KnowlageGraph {
 }
 
 export type KnowledgeGraphDocument = KnowlageGraph;
+export type KnowledgeGraph = KnowlageGraph;
 
 export interface Node {
   id: string;

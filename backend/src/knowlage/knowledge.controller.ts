@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -13,7 +14,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
-import { DatabaseService } from '../database/database.service';
 import { OntologyEntity } from '../ontology/ontology.entity';
 import type {
   CreateKnowledgeRequest,
@@ -30,7 +30,7 @@ import type {
 } from './dto/responses.dto';
 import type { KnowledgeGraph } from './dto/graph.dto';
 import { KnowledgeEntity } from './knowledge.entity';
-import { GraphServiceImpl } from './knowlage.service';
+import { GRAPH_SERVICE_TOKEN, type GraphService } from './knowlage.service';
 
 @Controller(['knowledge', 'knowlage'])
 export class KnowledgeController {
@@ -39,14 +39,19 @@ export class KnowledgeController {
     private readonly knowledgeRepository: Repository<KnowledgeEntity>,
     @InjectRepository(OntologyEntity)
     private readonly ontologyRepository: Repository<OntologyEntity>,
-    private readonly databaseService: DatabaseService,
+    @Inject(GRAPH_SERVICE_TOKEN)
+    private readonly graphService: GraphService,
   ) {}
 
   @Post()
   async create(
     @Body() request: CreateKnowledgeRequest,
   ): Promise<CreateKnowledgeResponse> {
-    const entity = this.knowledgeRepository.create({id: randomUUID(), name: request.name, summary: request.summary});
+    const entity = this.knowledgeRepository.create({
+      id: randomUUID(),
+      name: request.name,
+      summary: request.summary,
+    });
     const saved = await this.knowledgeRepository.save(entity);
 
     return this.toCreateResponse(saved);
@@ -55,9 +60,7 @@ export class KnowledgeController {
   @Get()
   async findAll(): Promise<ListKnowledgeResponse> {
     const entities = await this.knowledgeRepository.find({
-      order: {
-        updated_at: 'DESC',
-      },
+      order: { updated_at: 'DESC' },
     });
     const items: KnowledgeSummaryItem[] = entities.map((entity) => ({
       id: entity.id,
@@ -84,52 +87,22 @@ export class KnowledgeController {
 
   @Get(':id/graph')
   async getGraph(@Param() request: GetKnowledgeRequest): Promise<KnowledgeGraph> {
-    const entity = await this.knowledgeRepository.findOne({
-      where: { id: request.id },
-    });
-    if (!entity) {
-      throw new NotFoundException(`Knowledge "${request.id}" was not found`);
-    }
-
-    const ontology = (await this.ontologyRepository.find({ take: 1 }))[0] ?? null;
-    const graphService = new GraphServiceImpl(entity, ontology, this.databaseService);
-
-    const [nodes, relations, contexts, contextRelations] = await Promise.all([
-      graphService.findNodes(),
-      graphService.findRelations(),
-      graphService.findContexts(),
-      graphService.findContextRelations(),
-    ]);
-
-    return {
-      id: entity.id,
-      ontologyId: ontology?.id ?? '',
-      name: entity.name,
-      summary: entity.summary,
-      nodes,
-      relations,
-      contexts,
-      contextRelations,
-    };
+    return this.graphService.load(request.id);
   }
-
 
   @Put(':id/graph')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async putGraph(@Param() request: GetKnowledgeRequest, @Body() graph: KnowledgeGraph): Promise<void> {
-    const entity = await this.knowledgeRepository.findOne({
-      where: { id: request.id },
-    });
-    if (!entity) {
-      throw new NotFoundException(`Knowledge "${request.id}" was not found`);
+  async putGraph(
+    @Param() request: GetKnowledgeRequest,
+    @Body() graph: KnowledgeGraph,
+  ): Promise<void> {
+    if (request.id !== graph.id) {
+      throw new NotFoundException(
+        `Knowledge "${request.id}" was not found`,
+      );
     }
 
-    const ontology = (await this.ontologyRepository.find({ take: 1 }))[0] ?? null;
-    const graphService = new GraphServiceImpl(entity, ontology, this.databaseService);
-
-    graph.nodes.forEach((n) => graphService.createNode(n));
-    graph.contexts.forEach((c) => graphService.contextualize(c, graph.contextRelations.filter((v) => v.contextId === c.id)));
-    graph.relations.forEach((r) => graphService.relate(r))
+    return this.graphService.save(graph);
   }
 
   @Put(':id')
