@@ -1,10 +1,18 @@
 import type {
+  Association as OntologyAssociation,
+  Context as OntologyContext,
   Document as OntologyDocument,
   Element as OntologyElement,
   Relation as OntologyRelation,
 } from '../../../../backend/src/ontology/dto/ontology.dto';
 
-export type { OntologyDocument, OntologyElement, OntologyRelation };
+export type {
+  OntologyAssociation,
+  OntologyContext,
+  OntologyDocument,
+  OntologyElement,
+  OntologyRelation,
+};
 
 export type OntologyListItem = {
   id: string;

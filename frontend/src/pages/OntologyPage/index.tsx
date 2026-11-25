@@ -2,9 +2,11 @@ import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import GraphEditor from './components/GraphEditor';
 import ElementEditor from './components/ElementEditor';
+import OntologyConfigurator from './components/OntologyConfigurator';
 import { createEmptyDocument, createMockDocument } from './mockData';
 import type {
   GraphSelection,
+  OntologyContext,
   OntologyDocument,
   OntologyElement,
   OntologyListItem,
@@ -26,7 +28,10 @@ export default function OntologyPage() {
   }));
   const [selectedId, setSelectedId] = useState<string | null>(initialOntologies[0].id);
   const [selection, setSelection] = useState<GraphSelection>(null);
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
   const document = selectedId ? documents[selectedId] : undefined;
+  const configuringOntology = ontologies.find((ontology) => ontology.id === configuringId);
+  const configuringDocument = configuringId ? documents[configuringId] : undefined;
 
   function addOntology() {
     const ontology = { id: crypto.randomUUID(), name: 'Новая онтология' };
@@ -34,13 +39,19 @@ export default function OntologyPage() {
     setDocuments((current) => ({ ...current, [ontology.id]: createEmptyDocument() }));
     setSelectedId(ontology.id);
     setSelection(null);
-    return ontology;
   }
 
-  function renameOntology(id: string, name: string) {
+  function saveOntologyConfiguration(id: string, name: string, contexts: OntologyContext[]) {
     setOntologies((current) => current.map((ontology) =>
       ontology.id === id ? { ...ontology, name } : ontology,
     ));
+    setDocuments((current) => {
+      const currentDocument = current[id];
+      return currentDocument
+        ? { ...current, [id]: { ...currentDocument, contexts } }
+        : current;
+    });
+    setConfiguringId(null);
   }
 
   function deleteOntology(id: string) {
@@ -55,6 +66,7 @@ export default function OntologyPage() {
       setSelectedId(remaining[0]?.id ?? null);
       setSelection(null);
     }
+    setConfiguringId(null);
   }
 
   function updateDocument(update: (current: OntologyDocument) => OntologyDocument) {
@@ -103,8 +115,7 @@ export default function OntologyPage() {
           setSelection(null);
         }}
         onAdd={addOntology}
-        onRename={renameOntology}
-        onDelete={deleteOntology}
+        onConfigure={(ontology) => setConfiguringId(ontology.id)}
       />
       {document ? (
         <>
@@ -121,6 +132,19 @@ export default function OntologyPage() {
         <div className="grid min-w-0 flex-1 place-items-center text-sm text-neutral-400">
           Добавьте онтологию, чтобы начать работу.
         </div>
+      )}
+      {configuringOntology && configuringDocument && (
+        <OntologyConfigurator
+          ontology={configuringOntology}
+          contexts={configuringDocument.contexts}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfiguringId(null);
+            }
+          }}
+          onSave={saveOntologyConfiguration}
+          onDelete={deleteOntology}
+        />
       )}
     </div>
   );

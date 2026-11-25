@@ -48,7 +48,7 @@ export default function ElementEditor({
         </button>
       </div>
       {vertex ? (
-        <VertexEditor onChange={onVertexChange} vertex={vertex} />
+        <VertexEditor elements={document.elements} onChange={onVertexChange} vertex={vertex} />
       ) : edge ? (
         <EdgeEditor edge={edge} onChange={onEdgeChange} vertices={document.elements} />
       ) : null}

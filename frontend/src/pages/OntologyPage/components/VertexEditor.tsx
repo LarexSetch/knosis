@@ -1,13 +1,15 @@
+import AssociationsList from './AssociationsList';
 import type { OntologyElement } from '../types';
 
 type VertexEditorProps = {
   vertex: OntologyElement;
+  elements: OntologyElement[];
   onChange: (vertex: OntologyElement) => void;
 };
 
 const fieldClassName = 'w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500';
 
-export default function VertexEditor({ vertex, onChange }: VertexEditorProps) {
+export default function VertexEditor({ vertex, elements, onChange }: VertexEditorProps) {
   return (
     <div className="space-y-4">
       <label className="block space-y-1 text-xs text-neutral-400">
@@ -46,6 +48,12 @@ export default function VertexEditor({ vertex, onChange }: VertexEditorProps) {
       <p className="text-xs text-neutral-500">
         Позиция: {Math.round(vertex.meta.position.x)}, {Math.round(vertex.meta.position.y)}
       </p>
+
+      <AssociationsList
+          associations={vertex.associations}
+          elements={elements}
+          onChange={(associations) => onChange({ ...vertex, associations })}
+      />
     </div>
   );
 }

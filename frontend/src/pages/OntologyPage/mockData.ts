@@ -8,7 +8,15 @@ export function createMockDocument(): OntologyDocument {
         name: 'Человек',
         summary: 'Сотрудник или участник команды.',
         meta: { color: '#525252', position: { x: 40, y: 120 } },
-        associations: [],
+        associations: [
+          {
+            id: 'person-scope',
+            name: 'Участие в проектах',
+            summary: 'Проекты, в которых участвует человек.',
+            elementIds: ['team', 'project'],
+            elementsAll: false,
+          },
+        ],
       },
       {
         id: 'team',
