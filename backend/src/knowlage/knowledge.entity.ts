@@ -5,7 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  JoinColumn,
+  ManyToOne,
 } from 'typeorm';
+import { OntologyEntity } from '../ontology/ontology.entity';
 
 /**
  * TypeORM entity representing a row in the `knowledge` table.
@@ -21,6 +24,10 @@ export class KnowledgeEntity {
 
   @Column({ type: 'text', default: '' })
   summary!: string;
+
+  @ManyToOne(() => OntologyEntity, { nullable: true })
+  @JoinColumn({ name: 'ontology_id' })
+  ontology?: OntologyEntity | null;
 
   @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
