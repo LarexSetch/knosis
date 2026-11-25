@@ -38,6 +38,10 @@ cd frontend
 npm run build
 ```
 
+## API онтологий
+
+Сервис `src/api/ontologyService.ts` вызывает CRUD-endpoint-ы контроллера онтологий. Типы запросов и ответов берутся из DTO бэкенда. По умолчанию используется `http://localhost:3000`; адрес можно переопределить переменной `VITE_API_URL`.
+
 ## План архитектуры нового подхода
 
 1. **Интеграция с PostgreSQL + Apache AGE**:

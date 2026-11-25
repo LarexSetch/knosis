@@ -39,8 +39,6 @@ export class KnowledgeController {
     private readonly knowledgeRepository: Repository<KnowledgeEntity>,
     @InjectRepository(OntologyEntity)
     private readonly ontologyRepository: Repository<OntologyEntity>,
-    @Inject(GRAPH_SERVICE_TOKEN)
-    private readonly graphService: GraphService,
   ) {}
 
   @Post()
@@ -87,7 +85,16 @@ export class KnowledgeController {
 
   @Get(':id/graph')
   async getGraph(@Param() request: GetKnowledgeRequest): Promise<KnowledgeGraph> {
-    return this.graphService.load(request.id);
+    return {
+       id: '',
+        ontologyId: '',
+        name: '',
+        summary: '',
+        nodes: [],
+        relations: [],
+        contexts: [],
+        contextRelations: [],
+    };
   }
 
   @Put(':id/graph')
@@ -102,7 +109,6 @@ export class KnowledgeController {
       );
     }
 
-    return this.graphService.save(graph);
   }
 
   @Put(':id')
