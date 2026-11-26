@@ -74,5 +74,17 @@ a {
 .react-flow .react-flow__handle::after {
   content: '';
   position: absolute;
-  inset: -10px;
+  inset: -7px;
+}
+
+.react-flow .react-flow__edgeupdater {
+  cursor: grab;
+}
+
+.react-flow .react-flow__edge.selected .react-flow__edgeupdater,
+.react-flow .react-flow__edgeupdater:hover {
+  fill: #a3a3a3;
+  fill-opacity: 0.45;
+  stroke: #d4d4d4;
+  stroke-width: 1.5;
 }

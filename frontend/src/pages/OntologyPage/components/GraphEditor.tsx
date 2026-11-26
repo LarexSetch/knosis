@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Background,
   ConnectionMode,
@@ -10,28 +10,58 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type Node,
   type NodeProps,
 } from '@xyflow/react';
 import { Plus } from 'lucide-react';
-import type { GraphSelection, OntologyDocument } from '../types';
+import type { GraphSelection, OntologyDocument, OntologyRelation } from '../types';
 import '@xyflow/react/dist/style.css';
+
+type HandleSide = 'top' | 'right' | 'bottom' | 'left';
+type SideCounts = Record<HandleSide, number>;
 
 type OntologyNodeData = {
   label: string;
   color: string;
+  sideCounts: SideCounts;
 };
 
 type OntologyFlowNode = Node<OntologyNodeData, 'ontology'>;
 
-type HandleSide = 'top' | 'right' | 'bottom' | 'left';
-
 const DEFAULT_NODE_WIDTH = 120;
 const DEFAULT_NODE_HEIGHT = 36;
+const HANDLE_SIDES: readonly HandleSide[] = ['top', 'right', 'bottom', 'left'];
+const SIDE_TO_POSITION: Record<HandleSide, Position> = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+};
 
-function OntologyNode({ data, selected }: NodeProps<OntologyFlowNode>) {
+function createDefaultSideCounts(): SideCounts {
+  return { top: 1, right: 1, bottom: 1, left: 1 };
+}
+
+function areSideCountsEqual(a: SideCounts, b: SideCounts): boolean {
+  return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left;
+}
+
+function getHandleStyle(side: HandleSide, index: number, count: number) {
+  const offset = `${((index + 1) / (count + 1)) * 100}%`;
+  return side === 'top' || side === 'bottom' ? { left: offset } : { top: offset };
+}
+
+function OntologyNode({ id, data, selected }: NodeProps<OntologyFlowNode>) {
+  const updateNodeInternals = useUpdateNodeInternals();
+  const { top, right, bottom, left } = data.sideCounts;
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, top, right, bottom, left, updateNodeInternals]);
+
   return (
     <div
       className="relative rounded px-3 py-2 text-xs text-neutral-100"
@@ -40,10 +70,18 @@ function OntologyNode({ data, selected }: NodeProps<OntologyFlowNode>) {
         border: selected ? '1px solid #d4d4d4' : '1px solid #737373',
       }}
     >
-      <Handle id="top" position={Position.Top} type="source" />
-      <Handle id="right" position={Position.Right} type="source" />
-      <Handle id="bottom" position={Position.Bottom} type="source" />
-      <Handle id="left" position={Position.Left} type="source" />
+      {HANDLE_SIDES.map((side) => {
+        const count = Math.max(1, data.sideCounts[side]);
+        return Array.from({ length: count }, (_, index) => (
+          <Handle
+            id={`${side}-${index}`}
+            key={`${side}-${index}`}
+            position={SIDE_TO_POSITION[side]}
+            style={getHandleStyle(side, index, count)}
+            type="source"
+          />
+        ));
+      })}
       <span>{data.label}</span>
     </div>
   );
@@ -62,12 +100,12 @@ function getNodeCenter(node: OntologyFlowNode): { x: number; y: number } {
   };
 }
 
-function getAdaptiveHandles(
+function getAdaptiveSides(
   sourceNode: OntologyFlowNode | undefined,
   targetNode: OntologyFlowNode | undefined,
-): { sourceHandle: HandleSide; targetHandle: HandleSide } {
+): { sourceSide: HandleSide; targetSide: HandleSide } {
   if (!sourceNode || !targetNode) {
-    return { sourceHandle: 'bottom', targetHandle: 'top' };
+    return { sourceSide: 'bottom', targetSide: 'top' };
   }
 
   const sourceCenter = getNodeCenter(sourceNode);
@@ -77,13 +115,94 @@ function getAdaptiveHandles(
 
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0
-      ? { sourceHandle: 'right', targetHandle: 'left' }
-      : { sourceHandle: 'left', targetHandle: 'right' };
+      ? { sourceSide: 'right', targetSide: 'left' }
+      : { sourceSide: 'left', targetSide: 'right' };
   }
 
   return dy >= 0
-    ? { sourceHandle: 'bottom', targetHandle: 'top' }
-    : { sourceHandle: 'top', targetHandle: 'bottom' };
+    ? { sourceSide: 'bottom', targetSide: 'top' }
+    : { sourceSide: 'top', targetSide: 'bottom' };
+}
+
+type EndpointAttachment = {
+  relationId: string;
+  otherCenterAxis: number;
+  orderIndex: number;
+};
+
+type AdaptiveLayout = {
+  sideCountsByNode: Map<string, SideCounts>;
+  handlesByRelationId: Map<string, { sourceHandle: string; targetHandle: string }>;
+};
+
+function computeAdaptiveLayout(
+  nodes: OntologyFlowNode[],
+  relations: OntologyRelation[],
+): AdaptiveLayout {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const endpointsByKey = new Map<string, EndpointAttachment[]>();
+  const sidesByRelationId = new Map<string, { sourceSide: HandleSide; targetSide: HandleSide }>();
+
+  relations.forEach((relation, orderIndex) => {
+    const sourceNode = nodeMap.get(relation.sourceElementId);
+    const targetNode = nodeMap.get(relation.targetElementId);
+    const { sourceSide, targetSide } = getAdaptiveSides(sourceNode, targetNode);
+    sidesByRelationId.set(relation.id, { sourceSide, targetSide });
+
+    const sourceCenter = sourceNode ? getNodeCenter(sourceNode) : { x: 0, y: 0 };
+    const targetCenter = targetNode ? getNodeCenter(targetNode) : { x: 0, y: 0 };
+
+    const addEndpoint = (nodeId: string, side: HandleSide, otherCenter: { x: number; y: number }) => {
+      const key = `${nodeId}:${side}`;
+      const list = endpointsByKey.get(key) ?? [];
+      list.push({
+        relationId: relation.id,
+        otherCenterAxis: side === 'top' || side === 'bottom' ? otherCenter.x : otherCenter.y,
+        orderIndex,
+      });
+      endpointsByKey.set(key, list);
+    };
+
+    addEndpoint(relation.sourceElementId, sourceSide, targetCenter);
+    addEndpoint(relation.targetElementId, targetSide, sourceCenter);
+  });
+
+  const sideCountsByNode = new Map<string, SideCounts>();
+  nodes.forEach((node) => sideCountsByNode.set(node.id, createDefaultSideCounts()));
+
+  const slotIndexByKey = new Map<string, number>();
+
+  endpointsByKey.forEach((attachments, key) => {
+    attachments.sort(
+      (a, b) => a.otherCenterAxis - b.otherCenterAxis || a.orderIndex - b.orderIndex,
+    );
+
+    const separatorIndex = key.lastIndexOf(':');
+    const nodeId = key.slice(0, separatorIndex);
+    const side = key.slice(separatorIndex + 1) as HandleSide;
+
+    const counts = sideCountsByNode.get(nodeId) ?? createDefaultSideCounts();
+    counts[side] = Math.max(1, attachments.length);
+    sideCountsByNode.set(nodeId, counts);
+
+    attachments.forEach((attachment, index) => {
+      slotIndexByKey.set(`${attachment.relationId}:${key}`, index);
+    });
+  });
+
+  const handlesByRelationId = new Map<string, { sourceHandle: string; targetHandle: string }>();
+  relations.forEach((relation) => {
+    const sides = sidesByRelationId.get(relation.id) ?? { sourceSide: 'bottom', targetSide: 'top' };
+    const sourceSlot = slotIndexByKey.get(`${relation.id}:${relation.sourceElementId}:${sides.sourceSide}`) ?? 0;
+    const targetSlot = slotIndexByKey.get(`${relation.id}:${relation.targetElementId}:${sides.targetSide}`) ?? 0;
+
+    handlesByRelationId.set(relation.id, {
+      sourceHandle: `${sides.sourceSide}-${sourceSlot}`,
+      targetHandle: `${sides.targetSide}-${targetSlot}`,
+    });
+  });
+
+  return { sideCountsByNode, handlesByRelationId };
 }
 
 type GraphEditorProps = {
@@ -93,6 +212,7 @@ type GraphEditorProps = {
   onAddVertex: () => void;
   onConnect: (sourceElementId: string, targetElementId: string) => void;
   onReconnect: (relationId: string, sourceElementId: string, targetElementId: string) => void;
+  onDeleteEdge: (relationId: string) => void;
 };
 
 export default function GraphEditor({
@@ -102,40 +222,78 @@ export default function GraphEditor({
   onAddVertex,
   onConnect,
   onReconnect,
+  onDeleteEdge,
 }: GraphEditorProps) {
   const initialNodes = useMemo<OntologyFlowNode[]>(
     () => document.elements.map((element) => ({
       id: element.id,
       type: 'ontology',
       position: element.meta.position,
-      data: { label: element.name, color: element.meta.color },
+      data: {
+        label: element.name,
+        color: element.meta.color,
+        sideCounts: createDefaultSideCounts(),
+      },
     })),
     [document.elements],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState<OntologyFlowNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-
-  useEffect(() => setNodes(initialNodes), [initialNodes, setNodes]);
+  const reconnectSuccessfulRef = useRef(true);
 
   useEffect(() => {
-    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    setNodes((currentNodes) => {
+      const currentById = new Map(currentNodes.map((node) => [node.id, node]));
+
+      return initialNodes.map((node) => {
+        const existing = currentById.get(node.id);
+        return existing
+          ? {
+              ...existing,
+              position: node.position,
+              data: { ...node.data, sideCounts: existing.data.sideCounts },
+            }
+          : node;
+      });
+    });
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    const { sideCountsByNode, handlesByRelationId } = computeAdaptiveLayout(nodes, document.relations);
+
+    setNodes((currentNodes) => {
+      let hasChanges = false;
+      const nextNodes = currentNodes.map((node) => {
+        const nextCounts = sideCountsByNode.get(node.id) ?? createDefaultSideCounts();
+        if (areSideCountsEqual(node.data.sideCounts, nextCounts)) {
+          return node;
+        }
+        hasChanges = true;
+        return {
+          ...node,
+          data: { ...node.data, sideCounts: nextCounts },
+        };
+      });
+
+      return hasChanges ? nextNodes : currentNodes;
+    });
 
     setEdges((currentEdges) => {
       const selectedById = new Map(currentEdges.map((edge) => [edge.id, edge.selected]));
 
       return document.relations.map((relation) => {
-        const { sourceHandle, targetHandle } = getAdaptiveHandles(
-          nodeMap.get(relation.sourceElementId),
-          nodeMap.get(relation.targetElementId),
-        );
+        const handles = handlesByRelationId.get(relation.id) ?? {
+          sourceHandle: 'bottom-0',
+          targetHandle: 'top-0',
+        };
 
         return {
           id: relation.id,
           source: relation.sourceElementId,
           target: relation.targetElementId,
-          sourceHandle,
-          targetHandle,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
           label: relation.name,
           selected: selectedById.get(relation.id) ?? false,
           interactionWidth: 28,
@@ -146,7 +304,7 @@ export default function GraphEditor({
         };
       });
     });
-  }, [nodes, document.relations, setEdges]);
+  }, [nodes, document.relations, setNodes, setEdges]);
 
   function handleConnect(connection: Connection) {
     if (!connection.source || !connection.target || connection.source === connection.target) {
@@ -156,7 +314,12 @@ export default function GraphEditor({
     onConnect(connection.source, connection.target);
   }
 
+  function handleReconnectStart() {
+    reconnectSuccessfulRef.current = false;
+  }
+
   function handleReconnect(oldEdge: Edge, newConnection: Connection) {
+    reconnectSuccessfulRef.current = true;
     if (
       !newConnection.source
       || !newConnection.target
@@ -166,6 +329,13 @@ export default function GraphEditor({
     }
 
     onReconnect(oldEdge.id, newConnection.source, newConnection.target);
+  }
+
+  function handleReconnectEnd(_: MouseEvent | TouchEvent, edge: Edge) {
+    if (!reconnectSuccessfulRef.current) {
+      onDeleteEdge(edge.id);
+    }
+    reconnectSuccessfulRef.current = true;
   }
 
   return (
@@ -181,7 +351,9 @@ export default function GraphEditor({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onReconnectStart={handleReconnectStart}
         onReconnect={handleReconnect}
+        onReconnectEnd={handleReconnectEnd}
         onNodeClick={(_, node) => onSelect({ kind: 'vertex', id: node.id })}
         onEdgeClick={(_, edge) => onSelect({ kind: 'edge', id: edge.id })}
         onPaneClick={() => onSelect(null)}
@@ -193,6 +365,7 @@ export default function GraphEditor({
         nodesDraggable
         nodesConnectable
         edgesReconnectable
+        elevateEdgesOnSelect
         elementsSelectable
       >
         <Background color="#404040" gap={24} size={1} />

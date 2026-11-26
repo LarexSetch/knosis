@@ -11,7 +11,7 @@ type ElementEditorProps = {
   document: OntologyDocument;
   onClose: () => void;
   onChange: (item: EditableItem, previousId: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (kind: 'vertex' | 'edge', id: string) => void;
 };
 
 function isVertexItem(item: EditableItem): item is OntologyElement {
@@ -81,6 +81,13 @@ export default function ElementEditor({
     }
 
     const previousId = committedIdRef.current;
+    const siblings = isVertexItem(currentDraft)
+      ? documentRef.current.elements
+      : documentRef.current.relations;
+    if (!siblings.some((item) => item.id === previousId)) {
+      return;
+    }
+
     if (getItemLabelError(currentDraft, previousId, documentRef.current)) {
       return;
     }
@@ -165,16 +172,18 @@ export default function ElementEditor({
   }
 
   function handleDelete() {
+    const currentDraft = draftRef.current;
     const idToDelete = committedIdRef.current;
-    if (!idToDelete) {
+    if (!currentDraft || !idToDelete) {
       return;
     }
 
+    const kind = isVertexItem(currentDraft) ? 'vertex' : 'edge';
     // Clear draft refs before deleting so unmount cleanup does not commit a stale edit.
     draftRef.current = undefined;
     committedIdRef.current = '';
     committedSnapshotRef.current = '';
-    onDelete(idToDelete);
+    onDelete(kind, idToDelete);
   }
 
   return (
@@ -207,17 +216,13 @@ export default function ElementEditor({
       )}
 
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-800 pt-3">
-        {isVertexItem(draft) ? (
-          <button
-            className="rounded px-3 py-1.5 text-xs text-red-300 hover:bg-red-950"
-            onClick={handleDelete}
-            type="button"
-          >
-            Удалить
-          </button>
-        ) : (
-          <span />
-        )}
+        <button
+          className="rounded px-3 py-1.5 text-xs text-red-300 hover:bg-red-950"
+          onClick={handleDelete}
+          type="button"
+        >
+          Удалить
+        </button>
         <button
           className="rounded border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-100 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!isDirty || Boolean(labelError)}

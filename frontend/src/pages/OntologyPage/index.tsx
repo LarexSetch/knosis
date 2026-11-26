@@ -10,6 +10,7 @@ import {
   ontologyPageApi,
   reconnectRelation,
   removeElement,
+  removeRelation,
 } from './ontologyApi';
 import type {
   GraphSelection,
@@ -244,9 +245,15 @@ export default function OntologyPage() {
     setSelection({ kind: 'vertex', id: newElement.id });
   }
 
-  function deleteVertex(id: string) {
-    void saveDocumentUpdate((current) => removeElement(current, id));
-    setSelection(null);
+  function deleteSelectedItem(kind: 'vertex' | 'edge', id: string) {
+    void saveDocumentUpdate((current) => (
+      kind === 'vertex' ? removeElement(current, id) : removeRelation(current, id)
+    ));
+    setSelection((current) => (current?.kind === kind && current.id === id ? null : current));
+  }
+
+  function deleteEdge(relationId: string) {
+    deleteSelectedItem('edge', relationId);
   }
 
   function connectVertices(sourceElementId: string, targetElementId: string) {
@@ -298,6 +305,7 @@ export default function OntologyPage() {
               document={document}
               onAddVertex={addVertex}
               onConnect={connectVertices}
+              onDeleteEdge={deleteEdge}
               onMoveVertex={moveVertex}
               onReconnect={reconnectEdge}
               onSelect={setSelection}
@@ -306,7 +314,7 @@ export default function OntologyPage() {
               document={document}
               onChange={handleElementChange}
               onClose={() => setSelection(null)}
-              onDelete={deleteVertex}
+              onDelete={deleteSelectedItem}
               selection={selection}
             />
           </>

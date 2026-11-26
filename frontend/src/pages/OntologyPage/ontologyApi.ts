@@ -230,6 +230,16 @@ export function reconnectRelation(
 }
 
 /**
+ * Removes a relation (`OntologyRelation`) from the document by ID.
+ */
+export function removeRelation(document: OntologyDocument, relationId: string): OntologyDocument {
+  return {
+    ...document,
+    relations: document.relations.filter((relation) => relation.id !== relationId),
+  };
+}
+
+/**
  * Page-level adapter over {@link OntologyService} that prepares request DTOs
  * and converts responses into structures consumed by `OntologyPage`.
  */
