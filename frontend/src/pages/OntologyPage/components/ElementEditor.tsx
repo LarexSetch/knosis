@@ -10,7 +10,8 @@ type ElementEditorProps = {
   selection: GraphSelection;
   document: OntologyDocument;
   onClose: () => void;
-  onChange: (item: EditableItem) => void;
+  onChange: (item: EditableItem, previousId: string) => void;
+  onDelete: (id: string) => void;
 };
 
 function isVertexItem(item: EditableItem): item is OntologyElement {
@@ -21,11 +22,31 @@ function serializeItem(item: EditableItem): string {
   return JSON.stringify(item);
 }
 
+function getItemLabelError(
+  draft: EditableItem | undefined,
+  previousId: string,
+  document: OntologyDocument,
+): string | null {
+  if (!draft) {
+    return null;
+  }
+
+  const trimmedId = draft.id.trim();
+  if (!trimmedId) {
+    return 'Label не может быть пустым';
+  }
+
+  const siblings = isVertexItem(draft) ? document.elements : document.relations;
+  const isDuplicate = siblings.some((item) => item.id !== previousId && item.id === trimmedId);
+  return isDuplicate ? 'Элемент с таким Label уже существует' : null;
+}
+
 export default function ElementEditor({
   selection,
   document,
   onClose,
   onChange,
+  onDelete,
 }: ElementEditorProps) {
   const isVertex = selection?.kind === 'vertex';
   const sourceItem = selection
@@ -39,10 +60,13 @@ export default function ElementEditor({
   const [draft, setDraft] = useState<EditableItem | undefined>(sourceItem);
   const draftRef = useRef<EditableItem | undefined>(sourceItem);
   const sourceItemRef = useRef<EditableItem | undefined>(sourceItem);
+  const documentRef = useRef<OntologyDocument>(document);
+  const committedIdRef = useRef<string>(sourceItem?.id ?? '');
   const committedSnapshotRef = useRef<string>(sourceItem ? serializeItem(sourceItem) : '');
   const onChangeRef = useRef(onChange);
 
   sourceItemRef.current = sourceItem;
+  documentRef.current = document;
   onChangeRef.current = onChange;
 
   const updateDraft = useCallback((nextItem: EditableItem) => {
@@ -56,18 +80,29 @@ export default function ElementEditor({
       return;
     }
 
-    const serialized = serializeItem(currentDraft);
+    const previousId = committedIdRef.current;
+    if (getItemLabelError(currentDraft, previousId, documentRef.current)) {
+      return;
+    }
+
+    const normalizedDraft: EditableItem = { ...currentDraft, id: currentDraft.id.trim() };
+
+    const serialized = serializeItem(normalizedDraft);
     if (serialized === committedSnapshotRef.current) {
       return;
     }
 
+    draftRef.current = normalizedDraft;
+    committedIdRef.current = normalizedDraft.id;
     committedSnapshotRef.current = serialized;
-    onChangeRef.current(currentDraft);
+    setDraft(normalizedDraft);
+    onChangeRef.current(normalizedDraft, previousId);
   }, []);
 
   useEffect(() => {
     const nextSource = sourceItemRef.current;
     draftRef.current = nextSource;
+    committedIdRef.current = nextSource?.id ?? '';
     committedSnapshotRef.current = nextSource ? serializeItem(nextSource) : '';
     setDraft(nextSource);
 
@@ -115,6 +150,7 @@ export default function ElementEditor({
     return null;
   }
 
+  const labelError = getItemLabelError(draft, committedIdRef.current, document);
   const isDirty = serializeItem(draft) !== committedSnapshotRef.current;
 
   function handleBlur(event: FocusEvent<HTMLElement>) {
@@ -126,6 +162,19 @@ export default function ElementEditor({
   function handleClose() {
     commitIfDirty();
     onClose();
+  }
+
+  function handleDelete() {
+    const idToDelete = committedIdRef.current;
+    if (!idToDelete) {
+      return;
+    }
+
+    // Clear draft refs before deleting so unmount cleanup does not commit a stale edit.
+    draftRef.current = undefined;
+    committedIdRef.current = '';
+    committedSnapshotRef.current = '';
+    onDelete(idToDelete);
   }
 
   return (
@@ -147,15 +196,31 @@ export default function ElementEditor({
       </div>
 
       {isVertexItem(draft) ? (
-        <VertexEditor elements={document.elements} onChange={updateDraft} vertex={draft} />
+        <VertexEditor
+          elements={document.elements}
+          labelError={labelError}
+          onChange={updateDraft}
+          vertex={draft}
+        />
       ) : (
-        <EdgeEditor edge={draft} onChange={updateDraft} vertices={document.elements} />
+        <EdgeEditor edge={draft} labelError={labelError} onChange={updateDraft} />
       )}
 
-      <div className="mt-4 flex justify-end border-t border-neutral-800 pt-3">
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-800 pt-3">
+        {isVertexItem(draft) ? (
+          <button
+            className="rounded px-3 py-1.5 text-xs text-red-300 hover:bg-red-950"
+            onClick={handleDelete}
+            type="button"
+          >
+            Удалить
+          </button>
+        ) : (
+          <span />
+        )}
         <button
-          className="rounded bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!isDirty}
+          className="rounded border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-100 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!isDirty || Boolean(labelError)}
           onClick={commitIfDirty}
           type="button"
         >

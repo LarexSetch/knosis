@@ -152,7 +152,7 @@ export default function OntologyConfigurator({
                 </button>
               </Dialog.Close>
               <button
-                className="rounded bg-neutral-100 px-3 py-1.5 text-sm text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!canSave}
                 onClick={save}
                 type="button"

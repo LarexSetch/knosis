@@ -3,7 +3,14 @@ import Sidebar from './components/Sidebar';
 import GraphEditor from './components/GraphEditor';
 import ElementEditor from './components/ElementEditor';
 import OntologyConfigurator from './components/OntologyConfigurator';
-import { ontologyPageApi } from './ontologyApi';
+import {
+  applyElementUpdate,
+  buildNewOntologyElement,
+  buildNewOntologyRelation,
+  ontologyPageApi,
+  reconnectRelation,
+  removeElement,
+} from './ontologyApi';
 import type {
   GraphSelection,
   OntologyContext,
@@ -204,16 +211,14 @@ export default function OntologyPage() {
     }
   }
 
-  function handleElementChange(item: OntologyElement | OntologyRelation) {
-    void saveDocumentUpdate((current) => ('meta' in item
-      ? {
-          ...current,
-          elements: current.elements.map((element) => (element.id === item.id ? item : element)),
-        }
-      : {
-          ...current,
-          relations: current.relations.map((relation) => (relation.id === item.id ? item : relation)),
-        }));
+  function handleElementChange(item: OntologyElement | OntologyRelation, previousId: string) {
+    void saveDocumentUpdate((current) => applyElementUpdate(current, item, previousId));
+    const kind = 'meta' in item ? 'vertex' : 'edge';
+    if (item.id !== previousId) {
+      setSelection((current) => (current?.kind === kind && current.id === previousId
+        ? { kind, id: item.id }
+        : current));
+    }
   }
 
   function moveVertex(id: string, position: { x: number; y: number }) {
@@ -223,6 +228,40 @@ export default function OntologyPage() {
         ? { ...vertex, meta: { ...vertex.meta, position } }
         : vertex)),
     }));
+  }
+
+  function addVertex() {
+    const currentDocument = selectedId ? documentsRef.current[selectedId] : undefined;
+    if (!currentDocument) {
+      return;
+    }
+
+    const newElement = buildNewOntologyElement(currentDocument.elements);
+    void saveDocumentUpdate((current) => ({
+      ...current,
+      elements: [...current.elements, newElement],
+    }));
+    setSelection({ kind: 'vertex', id: newElement.id });
+  }
+
+  function deleteVertex(id: string) {
+    void saveDocumentUpdate((current) => removeElement(current, id));
+    setSelection(null);
+  }
+
+  function connectVertices(sourceElementId: string, targetElementId: string) {
+    const newRelation = buildNewOntologyRelation(sourceElementId, targetElementId);
+    void saveDocumentUpdate((current) => ({
+      ...current,
+      relations: [...current.relations, newRelation],
+    }));
+    setSelection({ kind: 'edge', id: newRelation.id });
+  }
+
+  function reconnectEdge(relationId: string, sourceElementId: string, targetElementId: string) {
+    void saveDocumentUpdate((current) =>
+      reconnectRelation(current, relationId, sourceElementId, targetElementId),
+    );
   }
 
   return (
@@ -255,11 +294,19 @@ export default function OntologyPage() {
         />
         {document ? (
           <>
-            <GraphEditor document={document} onMoveVertex={moveVertex} onSelect={setSelection} />
+            <GraphEditor
+              document={document}
+              onAddVertex={addVertex}
+              onConnect={connectVertices}
+              onMoveVertex={moveVertex}
+              onReconnect={reconnectEdge}
+              onSelect={setSelection}
+            />
             <ElementEditor
               document={document}
               onChange={handleElementChange}
               onClose={() => setSelection(null)}
+              onDelete={deleteVertex}
               selection={selection}
             />
           </>

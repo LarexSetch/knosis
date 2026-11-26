@@ -1,19 +1,26 @@
-import type { OntologyElement, OntologyRelation } from '../types';
+import type { OntologyRelation } from '../types';
 
 type EdgeEditorProps = {
   edge: OntologyRelation;
-  vertices: OntologyElement[];
+  labelError?: string | null;
   onChange: (edge: OntologyRelation) => void;
 };
 
 const fieldClassName = 'w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500';
 
-export default function EdgeEditor({ edge, vertices, onChange }: EdgeEditorProps) {
+export default function EdgeEditor({ edge, labelError, onChange }: EdgeEditorProps) {
   return (
     <div className="space-y-4">
       <label className="block space-y-1 text-xs text-neutral-400">
-        ID
-        <input className={fieldClassName} readOnly value={edge.id} />
+        Label
+        <input
+          className={`${fieldClassName}${labelError ? ' border-red-700 focus:border-red-500' : ''}`}
+          onChange={(event) => onChange({ ...edge, id: event.target.value })}
+          value={edge.id}
+        />
+        {labelError && (
+          <span className="block text-xs text-red-300">{labelError}</span>
+        )}
       </label>
       <label className="block space-y-1 text-xs text-neutral-400">
         Название
@@ -30,26 +37,6 @@ export default function EdgeEditor({ edge, vertices, onChange }: EdgeEditorProps
           onChange={(event) => onChange({ ...edge, summary: event.target.value })}
           value={edge.summary}
         />
-      </label>
-      <label className="block space-y-1 text-xs text-neutral-400">
-        Источник
-        <select
-          className={fieldClassName}
-          onChange={(event) => onChange({ ...edge, sourceElementId: event.target.value })}
-          value={edge.sourceElementId}
-        >
-          {vertices.map((vertex) => <option key={vertex.id} value={vertex.id}>{vertex.name}</option>)}
-        </select>
-      </label>
-      <label className="block space-y-1 text-xs text-neutral-400">
-        Цель
-        <select
-          className={fieldClassName}
-          onChange={(event) => onChange({ ...edge, targetElementId: event.target.value })}
-          value={edge.targetElementId}
-        >
-          {vertices.map((vertex) => <option key={vertex.id} value={vertex.id}>{vertex.name}</option>)}
-        </select>
       </label>
     </div>
   );

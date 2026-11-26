@@ -4,17 +4,30 @@ import type { OntologyElement } from '../types';
 type VertexEditorProps = {
   vertex: OntologyElement;
   elements: OntologyElement[];
+  labelError?: string | null;
   onChange: (vertex: OntologyElement) => void;
 };
 
 const fieldClassName = 'w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500';
 
-export default function VertexEditor({ vertex, elements, onChange }: VertexEditorProps) {
+export default function VertexEditor({
+  vertex,
+  elements,
+  labelError,
+  onChange,
+}: VertexEditorProps) {
   return (
     <div className="space-y-4">
       <label className="block space-y-1 text-xs text-neutral-400">
-        ID
-        <input className={fieldClassName} readOnly value={vertex.id} />
+        Label
+        <input
+          className={`${fieldClassName}${labelError ? ' border-red-700 focus:border-red-500' : ''}`}
+          onChange={(event) => onChange({ ...vertex, id: event.target.value })}
+          value={vertex.id}
+        />
+        {labelError && (
+          <span className="block text-xs text-red-300">{labelError}</span>
+        )}
       </label>
       <label className="block space-y-1 text-xs text-neutral-400">
         Название
@@ -50,9 +63,9 @@ export default function VertexEditor({ vertex, elements, onChange }: VertexEdito
       </p>
 
       <AssociationsList
-          associations={vertex.associations}
-          elements={elements}
-          onChange={(associations) => onChange({ ...vertex, associations })}
+        associations={vertex.associations}
+        elements={elements}
+        onChange={(associations) => onChange({ ...vertex, associations })}
       />
     </div>
   );

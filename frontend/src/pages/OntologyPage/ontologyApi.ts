@@ -10,7 +10,13 @@ import type {
   UpdateOntologyResponse,
 } from '../../../../backend/src/ontology/dto/responses.dto';
 import { createEmptyDocument } from './mockData';
-import type { OntologyContext, OntologyDocument, OntologyListItem } from './types';
+import type {
+  OntologyContext,
+  OntologyDocument,
+  OntologyElement,
+  OntologyListItem,
+  OntologyRelation,
+} from './types';
 
 export interface LoadedOntology {
   ontology: OntologyListItem;
@@ -102,6 +108,124 @@ export function applyOntologyContexts(
   return {
     ...document,
     contexts,
+  };
+}
+
+/**
+ * Builds a new graph vertex (`OntologyElement`) with a non-overlapping default position.
+ */
+export function buildNewOntologyElement(existingElements: OntologyElement[]): OntologyElement {
+  const offset = (existingElements.length % 6) * 40;
+  return {
+    id: crypto.randomUUID(),
+    name: 'Новый элемент',
+    summary: '',
+    meta: {
+      color: '#525252',
+      position: { x: 80 + offset, y: 80 + offset },
+    },
+    associations: [],
+  };
+}
+
+/**
+ * Builds a new graph relation (`OntologyRelation`) connecting two elements.
+ */
+export function buildNewOntologyRelation(
+  sourceElementId: string,
+  targetElementId: string,
+): OntologyRelation {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Новая связь',
+    summary: '',
+    sourceElementId,
+    targetElementId,
+  };
+}
+
+/**
+ * Applies an updated vertex or relation to the document, cascading vertex label renames
+ * across relations and element associations.
+ */
+export function applyElementUpdate(
+  document: OntologyDocument,
+  item: OntologyElement | OntologyRelation,
+  previousId: string,
+): OntologyDocument {
+  if (!('meta' in item)) {
+    return {
+      ...document,
+      relations: document.relations.map((relation) => (relation.id === previousId ? item : relation)),
+    };
+  }
+
+  const renamed = item.id !== previousId;
+  const elements = document.elements.map((element) => {
+    const nextElement = element.id === previousId ? item : element;
+    if (!renamed) {
+      return nextElement;
+    }
+
+    return {
+      ...nextElement,
+      associations: nextElement.associations.map((association) => ({
+        ...association,
+        elementIds: association.elementIds.map((id) => (id === previousId ? item.id : id)),
+      })),
+    };
+  });
+
+  const relations = renamed
+    ? document.relations.map((relation) => ({
+        ...relation,
+        sourceElementId: relation.sourceElementId === previousId ? item.id : relation.sourceElementId,
+        targetElementId: relation.targetElementId === previousId ? item.id : relation.targetElementId,
+      }))
+    : document.relations;
+
+  return {
+    ...document,
+    elements,
+    relations,
+  };
+}
+
+/**
+ * Removes a vertex from the document along with any relations and association references pointing to it.
+ */
+export function removeElement(document: OntologyDocument, elementId: string): OntologyDocument {
+  return {
+    ...document,
+    elements: document.elements
+      .filter((element) => element.id !== elementId)
+      .map((element) => ({
+        ...element,
+        associations: element.associations.map((association) => ({
+          ...association,
+          elementIds: association.elementIds.filter((id) => id !== elementId),
+        })),
+      })),
+    relations: document.relations.filter(
+      (relation) => relation.sourceElementId !== elementId && relation.targetElementId !== elementId,
+    ),
+  };
+}
+
+/**
+ * Updates `sourceElementId` and `targetElementId` for a reconnected relation.
+ */
+export function reconnectRelation(
+  document: OntologyDocument,
+  relationId: string,
+  sourceElementId: string,
+  targetElementId: string,
+): OntologyDocument {
+  return {
+    ...document,
+    relations: document.relations.map((relation) => (relation.id === relationId
+      ? { ...relation, sourceElementId, targetElementId }
+      : relation)),
   };
 }
 
