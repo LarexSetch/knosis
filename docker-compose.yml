@@ -18,6 +18,67 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: dev
+    container_name: knosis_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-knosis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-knosis_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-knosis}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./backend/tsconfig.json:/app/backend/tsconfig.json:ro
+      - ./backend/nest-cli.json:/app/backend/nest-cli.json:ro
+      - ./backend/src:/app/backend/src
+    ports:
+      - "${PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: dev
+    container_name: knosis_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    volumes:
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./backend/src:/app/backend/src:ro
+      - ./frontend/tsconfig.json:/app/frontend/tsconfig.json:ro
+      - ./frontend/vite.config.ts:/app/frontend/vite.config.ts:ro
+      - ./frontend/index.html:/app/frontend/index.html:ro
+      - ./frontend/src:/app/frontend/src
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   knosis_pgdata:
     name: knosis_pgdata
